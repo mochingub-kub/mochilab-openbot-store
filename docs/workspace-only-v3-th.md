@@ -144,3 +144,17 @@ Production ไม่ได้ถูกแก้โดยงานนี้ แ�
 การรันแบบอ่านอย่างเดียวบน UmbrelOS Host (หลังตรวจที่มาสคริปต์และ PyYAML): `sudo python3 tools/v3_compose_plan.py` โดยต้องเรียกจาก checkout ของ **branch V3** ไม่ใช่ branch PR #1 ตัวโปรแกรมจะไม่สร้างไฟล์ output และจะไม่เปลี่ยนค่าจริง
 
 **ข้อจำกัด**: เช็กเฉพาะ YAML ของ Compose ฉบับเดียว ยังไม่ได้ตรวจ effective overrides, Umbrel app lifecycle, ไฟล์ Hook, AppArmor/Seccomp ใน Kernel, backup, restore หรือการทำงานจริงของ Agent จึงยัง `NOT_DEPLOYABLE`. ไม่ใช้ `RESULT=V3_COMPOSE_READ_ONLY_PLAN_PASS` เป็นเงื่อนไขให้หยุด OpenBot หรือ Apply Production
+
+## 26 ตุลาคม 2026 — รองรับ UmbrelOS managed long-form Volume (Read-only planner)
+
+ผู้ดูแลรัน `tools/v3_compose_plan.py` บน Host แล้วรายงาน `BLOCKED=INVALID_SCALAR_VOLUME` พร้อม `HOST_FILES_CHANGED=NO` ซึ่งแสดงว่ารายการ Volume ไม่ใช่ String ตามที่ตัวตรวจรุ่นแรกสมมติ ข้อผิดพลาดนี้เกิด **ก่อนการจำลองแก้ Security Options** และไม่ใช่หลักฐานว่าข้อมูลเสียหาย
+
+ตรวจซอร์ส `getumbrel/umbrel:packages/umbreld/source/modules/apps/app.ts`: `patchComposeFile()` อาจ redirect `${APP_DATA_DIR}/data` ไป `${APP_DATA_ROOT}`; จากนั้น `disableAppDataRootHostPathCreation()` แปลง Short Bind เป็น Mapping ที่มี `type: bind`, `source: ${APP_DATA_ROOT}`, `target: /data`, `read_only: false`, `bind.create_host_path: false`. นี่เป็นสาเหตุ **ที่เป็นไปได้สูง** แต่ยังไม่ใช่การอ่านโครงสร้าง Volume จากไฟล์จริงของเจ้าของ
+
+อัปเดตตัวตรวจ V3 เพื่ออนุญาตรูปแบบ Short Bind ที่รู้จัก หรือ Long Bind แบบ UmbrelOS **เฉพาะฟิลด์และค่าที่ระบุครบ** เท่านั้น (ไม่อนุญาต Source/Target แปลกใหม่, Mount เพิ่ม, หรือ `create_host_path: true`). เพิ่ม Regression Tests สำหรับ long-form bind ที่ถูกต้องและ drift ที่ต้องปฏิเสธ ไม่เปลี่ยน Compose จริง ไม่ Merge/Deploy
+
+คำสั่งอ่านอย่างเดียวบน UmbrelOS Host หลังดึง V3 commit ใหม่: `python3 /tmp/mochilab-v3-plan.py` โดยต้องตรวจลายนิ้วมือไฟล์กับ commit ที่ตั้งใจใช้ก่อนเรียก และใช้ PyYAML ที่ติดตั้งอยู่แล้ว ไม่ติดตั้งอะไรเพิ่ม
+
+หากยัง BLOCKED ให้เก็บเฉพาะเหตุผลและตรวจชนิด/ชื่อฟิลด์ใน `volumes` แบบ **ไม่แสดงค่า Source path หรือ Environment** ก่อนปรับกฎอีกครั้ง ห้ามเปลี่ยน live Volume, ปิดการตรวจ Drift หรือ Apply Production เพื่อให้ตัวตรวจผ่าน
+
+สถานะ: ตัวตรวจ Read-only รุ่นแก้ไขถูก Stage ใน Draft PR #4 เท่านั้น; ยังไม่ผ่านกับ Compose จริง, ยังไม่มี V3 Installer, ไม่มีการหยุด OpenBot, ไม่มีการยืนยัน Functional Test
