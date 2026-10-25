@@ -21,3 +21,17 @@
 8. The Codex Workspace only bubblewrap mount/newroot problem is **separate**, still unverified, and must not be claimed fixed by this engine upgrade.
 
 Sources: https://github.com/nightly-labs/openbot/blob/v0.50.0/docs/docker.md and https://github.com/nightly-labs/openbot/releases/tag/v0.50.0
+
+## Read-only host backup preflight
+
+Run the reviewed helper ONLY on the UmbrelOS Host over SSH, not in Portainer or an OpenBot agent. It checks the live Docker /data bind mount, filesystem, external block devices and installed tools. It does NOT stop OpenBot, change security, create a backup or modify disk contents:
+
+```sh
+git clone --depth 1 --branch release/openbot-0.50.0-reviewed-upgrade https://github.com/mochingub-kub/mochilab-openbot-store.git /tmp/mochilab-openbot-upgrade-review
+bash -n /tmp/mochilab-openbot-upgrade-review/tools/preflight-openbot-backup.sh
+sudo bash /tmp/mochilab-openbot-upgrade-review/tools/preflight-openbot-backup.sh
+```
+
+The MCP Files path `/External/<name>` is virtual and might differ from the actual Host Linux mount. Identify the actual mount path using lsblk/findmnt, verify disk capacity/health, persistence, ownership and encryption. After reviewing the output, an optional `--candidate /actual/host/mount/path` rechecks that it is on a distinct filesystem. Different mount IDs by themselves do not establish that the destination is a different healthy physical disk.
+
+OpenBot /data contains browser sessions, agent data, provider sign-in state and its encryption keyring. Do NOT make a hot copy and do NOT store an unencrypted archive on a removable device without reviewing access and encryption. A consistent copy requires the engine stopped after its databases are closed. A checksum alone does not demonstrate recovery. Keep the Sandbox Draft PR #1 separate; it does not authorize mount policy relaxation.
