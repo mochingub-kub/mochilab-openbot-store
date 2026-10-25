@@ -22,6 +22,29 @@ Sources:
 - https://github.com/mochingub-kub/mochilab-openbot-store/blob/ace1bd751322c7724ffb9098acb6401c0cc5459b/mochilab-openbot/hooks/mochilab-openbot.apparmor
 - https://github.com/containers/bubblewrap/blob/v0.9.0/bubblewrap.c
 
+## 2026-10-25 owner-run isolated baseline
+
+On the UmbrelOS Host the owner executed the reviewed `tools/stage-workspace-bwrap.sh` using a disposable same-image container with no network, host binds, real `/data`, Docker socket or additional capabilities. The output was:
+
+```text
+LAB_SCOPE=DISPOSABLE_ONLY NETWORK=NONE HOST_BINDS=NONE NO_NEW_CAPABILITIES=YES
+PRODUCTION_RESTART=NO APP_POLICY_CHANGE=NO DATA_CHANGE=NO
+LOADED_APPARMOR_PROFILE_CONTENT=NOT_VERIFIED
+UID=1000
+APPARMOR=mochilab-openbot (enforce)
+BWRAP_VERSION=bubblewrap 0.9.0
+USERNS_EXIT=0
+bwrap: Failed to make / slave: Operation not permitted
+BWRAP_EXIT=1
+RESULT=BASELINE_RECORDED; NO_POLICY_REPAIR
+NOT_TESTED: actual Codex sandbox, writes, outside-denials, persistence
+```
+
+Interpretation: basic user namespaces work but bubblewrap's first mount propagation operation is rejected. `BASELINE_RECORDED` marks a successful diagnostic run; it does NOT mean that the Sandbox succeeded. In bubblewrap 0.9.0 source, the failing mount is `mount(NULL, "/", NULL, MS_SILENT | MS_SLAVE | MS_REC, NULL)`; later stages also require other mounts, `pivot_root` and `umount2`. The current seccomp default-deny profile cannot admit the mount without an outer CAP_SYS_ADMIN, and the repository AppArmor policy has `deny mount,`. It is not enough to change only the first mount operation.
+
+An Umbrel MCP read of a bounded recent system journal found no `apparmor="DENIED"` / mount audit entries matching this test. That is NOT evidence that the loaded AppArmor policy allows mount; explicit denies can be silent, and loaded-profile bytes remain unverified.
+
+Next gate: review the exact permitted mount operations under a disposable **distinct** AppArmor lab profile, if and only if the operator approves a temporary host policy load and has a rollback. A staging-only experiment is not production approval. Any candidate must keep no host bind mounts, no production data, no network, no privileged/CAP_SYS_ADMIN and no unconfined security settings. Do not merge this PR or update production until Codex Workspace only functionality and positive/negative filesystem isolation tests pass.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
