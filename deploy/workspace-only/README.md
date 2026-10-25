@@ -1,5 +1,8 @@
 # OpenBot Workspace only - UmbrelOS 2.x guarded deployment
 
+> **STOP / NO PRODUCTION APPLY:** V2's fixed `OLD_COMPOSE` Git blob SHA is invalid for the live UmbrelOS-managed `docker-compose.yml`. The running UmbrelOS `App.patchComposeFile()` rewrites Compose (including `container_name` and possibly volume source adjustments). On the owner's host, V2 precheck returned `BLOCKED=FILE_HASH_DRIFT:docker-compose.yml`; exact changed fields have not been inspected. Overwriting the live patched Compose with an unpatched repository template is not a validated production method. V2 is intentionally fail-closed. Do not call `--stage` / MCP stop as part of this deployment until a semantic, in-place patch and reversible config backup are reviewed against the live file. No Production change occurred from read-only V2 checks.
+
+
 User-approved scope: OpenBot Workspace only production policy, minimum off-device copy for rollback, and real functional test. **Do not update OpenBot or build a new backup system** in this change.
 
 ## Why the first script was retired
