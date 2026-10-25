@@ -57,4 +57,55 @@ class Cases(unittest.TestCase):
     def test_mapping_security_opt_rejected(self):
         self.check_block(BASE.replace('    security_opt:\n      - seccomp=${APP_DATA_DIR}/seccomp-0.49.0.json # policy\n      - "apparmor=mochilab-openbot"\n      - no-new-privileges:true', '    security_opt:\n      apparmor: mochilab-openbot'))
 
+
+    @staticmethod
+    def umbrel_long_volume():
+        return """    volumes:
+      - type: bind
+        source: ${APP_DATA_ROOT}
+        target: /data
+        read_only: false
+        bind:
+          create_host_path: false
+"""
+
+    def long_compose(self, replacement=None):
+        original = "    volumes:\n      - ${APP_DATA_DIR}/data:/data\n"
+        longform = self.umbrel_long_volume() if replacement is None else replacement
+        assert original in BASE
+        return BASE.replace(original, longform)
+
+    def test_umbrel_managed_long_volume_passes(self):
+        self.assertEqual(len(simulate(self.long_compose())), 64)
+
+    def test_umbrel_long_volume_source_drift_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "${APP_DATA_ROOT}", "/etc",
+        )))
+
+    def test_umbrel_long_volume_type_drift_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "type: bind", "type: volume",
+        )))
+
+    def test_umbrel_long_volume_target_drift_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "target: /data", "target: /host",
+        )))
+
+    def test_umbrel_long_volume_readonly_drift_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "read_only: false", "read_only: true",
+        )))
+
+    def test_umbrel_long_volume_bind_creation_drift_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "create_host_path: false", "create_host_path: true",
+        )))
+
+    def test_umbrel_long_volume_extra_option_denied(self):
+        self.check_block(self.long_compose(self.umbrel_long_volume().replace(
+            "create_host_path: false", "create_host_path: false\n          propagation: shared",
+        )))
+
 if __name__=='__main__': unittest.main(verbosity=2)
