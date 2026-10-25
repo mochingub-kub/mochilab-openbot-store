@@ -47,6 +47,21 @@ Before a security-policy patch can be promoted:
 
 The actual policy amendment is deliberately NOT INCLUDED until those observations exist. These documents and tools are a repair-preparation patch, not a complete runtime repair.
 
+## Isolated baseline probe (new, no runtime changes)
+
+The operator can test the current DENIED Bubblewrap baseline using tools/stage-workspace-bwrap.sh on the UmbrelOS HOST. This does not change the app, profile or any agent setting. The script launches one disposable container using the *exact immutable locally present image ID* and pinned current policies, with no network, no host bind mount, no production /data, no Docker socket, a read-only filesystem and temporary in-memory /data and /tmp. It is resource- and time-limited.
+
+Steps (run from the UmbrelOS Host, NOT inside Portainer or an OpenBot agent):
+
+    git clone --depth 1 --branch review/codex-workspace-only-preparation https://github.com/mochingub-kub/mochilab-openbot-store.git /tmp/mochilab-openbot-workspace-review
+    less /tmp/mochilab-openbot-workspace-review/tools/stage-workspace-bwrap.sh
+    sudo bash /tmp/mochilab-openbot-workspace-review/tools/stage-workspace-bwrap.sh
+
+Inspect the script before execution. This test creates a disposable Docker container and consumes some resources, so run it while agents are idle. It does not load AppArmor or change any host policy. Its baseline denial is evidence for the current configuration only. A successful bwrap probe is NOT a Codex Workspace only functional test or security certification.
+
+Important alternate-path rejection: Codex 0.164.0 still has a legacy Landlock feature, but the tagged upstream README explicitly rejects it for filesystem-restricted policies because it cannot isolate app-server Unix sockets. Do not enable features.use_legacy_landlock as a fix. Source: https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/linux-sandbox/README.md
+
+No candidate mount relaxation is in this PR. Further policy review and isolated tests are needed before any production change.
 ## Durable packaging requirements for the later reviewed policy patch
 
 - Vendor versioned policy artifacts under hooks/, which this Umbrel updater copies. Do not rely on arbitrary new top-level directories being copied on update.
