@@ -3,34 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
   <meta name="referrer" content="no-referrer">
-  <title>OpenBot on Mochilab</title>
-  <style>
-    :root{color-scheme:dark;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b0d13;color:#f1f4fc}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;background:radial-gradient(circle at 20% 10%,#2a2356 0,transparent 44%),radial-gradient(circle at 84% 90%,#13273e 0,transparent 44%),#0b0d13}
-    main{max-width:720px;width:100%;border-radius:24px;border:1px solid #34394c;padding:clamp(24px,5vw,42px);background:rgba(18,22,32,.94);box-shadow:0 30px 100px rgba(0,0,0,.3)}
-    .eyebrow{color:#b8a2ff;letter-spacing:.12em;font-weight:800;font-size:.76rem;text-transform:uppercase}
-    h1{font-size:clamp(2rem,5vw,3rem);margin:14px 0 10px;letter-spacing:-.045em}h2{font-size:1.1rem;margin:28px 0 8px}
-    p{line-height:1.75;color:#bcc5d8;margin:8px 0}strong{color:#f1f4fc}
-    .pill{display:inline-block;font-size:.78rem;border:1px solid #444c61;background:#1b2230;border-radius:999px;padding:5px 10px;color:#d6dced;margin-left:8px}
-    a.button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:#151323;background:#b9a4ff;padding:13px 20px;border-radius:11px;font-weight:800;margin-top:18px}
-    a.button:focus-visible,a.link:focus-visible{outline:3px solid #b9a4ff;outline-offset:3px}
-    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}
-    .command{display:block;background:#090d17;border:1px solid #394154;border-radius:12px;padding:18px;margin-top:12px;font-size:.88rem;color:#b6e4d4;user-select:all}
-    .note{border-top:1px solid #34394c;margin-top:27px;padding-top:16px;font-size:.88rem}
-    .link{color:#d4c9ff;text-decoration-thickness:1px}
-  </style>
+  <meta http-equiv="refresh" content="0;url=https://openbot.run/app">
+  <title>Opening OpenBot</title>
+  <script>window.location.replace("https://openbot.run/app");</script>
 </head>
-<body><main>
-  <div class="eyebrow">Mochilab / umbrelOS <span class="pill">Self-hosted · 0.49.0</span></div>
-  <h1>OpenBot</h1>
-  <p>AI teammates ทำงานอยู่ใน Docker ของ Umbrel ส่วนการแชตและจัดการ Agents ใช้เว็บ OpenBot ด้วยบัญชีเดียวกัน</p>
-  <a class="button" href="https://openbot.run/app" target="_blank" rel="noopener noreferrer">เปิด OpenBot Web App →</a>
-  <h2>เชื่อมบัญชีครั้งแรก</h2>
-  <p>เปิด Terminal/SSH ของ <strong>UmbrelOS Host</strong> แล้วใช้คำสั่งนี้ <strong>เพียงครั้งแรก</strong> หลังติดตั้งแอปสำเร็จ:</p>
-  <code class="command">sudo docker exec -it mochilab-openbot_openbot_1 openbot login</code>
-  <p>ใส่อีเมลและรหัสยืนยันใน Terminal เท่านั้น ไม่ต้องส่งรหัสในแชต จากนั้นเปิดเว็บ OpenBot ด้านบนด้วยอีเมลเดียวกัน แล้วเลือกเซิร์ฟเวอร์ที่เพิ่งเชื่อมต่อ</p>
-  <p>หากคำสั่งหา Container ไม่พบ ให้ตรวจสถานะของแอปใน Umbrel และชื่อจริงด้วย <code>sudo docker ps --format '{{.Names}}'</code></p>
-  <div class="note">หน้านี้เป็นเพียง <strong>Launcher/คู่มือตั้งค่า</strong> ไม่ใช่หน้าจัดการ Agents หรือการยืนยันว่า OpenBot เชื่อมต่อสำเร็จ แอป Agent ไม่มีพอร์ตเข้าจากภายนอกและใช้การเชื่อมต่อขาออกตามเอกสารผู้พัฒนา <a class="link" href="https://github.com/nightly-labs/openbot/blob/v0.49.0/docs/docker.md" target="_blank" rel="noopener noreferrer">อ่านคู่มือ Docker</a></div>
-</main></body></html>
+<body>
+  <main>
+    <p>กำลังเปิด OpenBot Web App…</p>
+    <p>หากไม่เปลี่ยนหน้าอัตโนมัติ <a href="https://openbot.run/app">เปิด OpenBot ที่นี่</a></p>
+  </main>
+</body>
+</html>

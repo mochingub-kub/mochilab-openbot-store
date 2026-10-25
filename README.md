@@ -7,7 +7,7 @@ Private-use packaging published in a public repository for umbrelOS 2.0. Install
 1. Open **Umbrel > App Store > ... > Community App Stores > Add**.
 2. Paste https://github.com/mochingub-kub/mochilab-openbot-store
 3. Open the **Mochilab** store and install **OpenBot**.
-4. Open the OpenBot icon on the Umbrel home screen. The icon opens a **local launcher**, not the full OpenBot chat interface.
+4. Open the OpenBot icon on the Umbrel home screen. Its local page **redirects automatically** to the upstream OpenBot Web App at https://openbot.run/app. The OpenBot engine still runs in the self-hosted container.
 5. In an **UmbrelOS host** SSH terminal (not Portainer's terminal), run:
 
 ```sh
@@ -22,7 +22,7 @@ Do not paste one-time codes, API keys, or credentials into issues or chats.
 
 - OpenBot is pinned to **0.49.0**; this community package is not affiliated with Umbrel or Nightly Labs.
 - The upstream OpenBot container has no published host port. Its only filesystem mount is its own persistent Umbrel app data folder (`/data` inside the container).
-- A separate, unprivileged static NGINX launcher is available through Umbrel app proxy on port **26771**.
+- A separate, unprivileged static NGINX page is available through the Umbrel app proxy on port **26771**. It instantly redirects the dock click to https://openbot.run/app; it does not host the OpenBot Web UI.
 - OpenBot needs its upstream `seccomp.json` profile for the Electron sandbox; an executable `hooks/pre-start` retrieves the exact file from the **v0.49.0** tag and verifies its Git blob SHA. This requires outbound HTTPS, `curl`, and `git` on the Umbrel host.
 - No privileged mode, host Docker socket, Cloudflare route, device mount, external HDD, or access to the other Mochilab app folders is configured.
 - This is a **development preview**: AI agents can execute commands and change data within their own container. Do not grant additional host mounts.
@@ -32,6 +32,10 @@ Do not paste one-time codes, API keys, or credentials into issues or chats.
 ## UmbrelOS update packaging note
 
 On umbrelOS 2.0, app updates copy only selected package paths, including `hooks/`. They do **not** automatically copy arbitrary new directories. Package `0.49.0-1` mistakenly stored its AppArmor profile in `security/`, so OpenBot could not start after updating. Package `0.49.0-2` places the verified policy in `hooks/` and the `pre-start` hook loads that exact file. **Host AppArmor loading and OpenBot login still need real-device validation.**
+
+## Dock direct-open behavior (0.49.0-3)
+
+The installed Umbrel dock URL remains local and managed by Umbrel. The static redirect has no credentials or privileged access. Umbrel updater **does not copy** the `landing/` directory on updates. `hooks/pre-start` copies the versioned `hooks/openbot-direct.html` into the app-owned `landing/index.html` atomically when needed. The redirect does **not** restart, re-sign-in, or migrate the OpenBot engine and leaves `/data` untouched; the Umbrel app update itself restarts containers, so plan around active agents.
 
 ## Validation status
 

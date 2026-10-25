@@ -46,3 +46,23 @@ if [[ ! -r /sys/kernel/security/apparmor/profiles ]] || \
   "$PARSER" -r -T -K "$APPARMOR_PROFILE"
 fi
 # Fail closed: Docker refuses to launch when the named profile is unavailable.
+
+# Keep the Umbrel dock icon, but go directly to the upstream OpenBot Web App.
+# Umbrel app updates only copy whitelisted paths (including hooks/), not landing/.
+# The redirect is a static page, not a credential proxy; no API keys or secrets.
+REDIRECT_SOURCE="${APP_DIR}/hooks/openbot-direct.html"
+LANDING_DIR="${APP_DIR}/landing"
+LANDING_PAGE="${LANDING_DIR}/index.html"
+if [[ -f "$REDIRECT_SOURCE" && -d "$LANDING_DIR" && ! -L "$LANDING_PAGE" ]] && \
+   ! cmp -s "$REDIRECT_SOURCE" "$LANDING_PAGE"; then
+  LANDING_TMP="$(mktemp "${LANDING_DIR}/.openbot-redirect.XXXXXX" 2>/dev/null || true)"
+  if [[ -n "$LANDING_TMP" ]] && \
+     cp "$REDIRECT_SOURCE" "$LANDING_TMP" && \
+     chmod 0644 "$LANDING_TMP" && \
+     mv -f "$LANDING_TMP" "$LANDING_PAGE"; then
+    echo 'OpenBot: Umbrel dock now opens the web client directly.'
+  else
+    [[ -z "$LANDING_TMP" ]] || rm -f "$LANDING_TMP"
+    echo 'OpenBot: launcher redirect could not be updated; keeping OpenBot engine available.' >&2
+  fi
+fi

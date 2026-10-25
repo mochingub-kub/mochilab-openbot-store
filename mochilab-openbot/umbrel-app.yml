@@ -5,11 +5,11 @@ storage:
 category: ai
 name: OpenBot
 tagline: Persistent AI teammates on your Umbrel
-version: "0.49.0-2"
+version: "0.49.0-3"
 description: >-
   Run the official OpenBot Docker server on your own umbrelOS device.
   OpenBot works in the background and you connect through the OpenBot web or desktop client.
-  This Umbrel app includes a local start page for the setup instructions and the web client link.
+  The Umbrel dock icon opens the OpenBot Web App automatically while the engine remains self-hosted.
 
 
   **First-time setup:** after installing, open a terminal on your Umbrel device and run
@@ -22,8 +22,8 @@ description: >-
   data directory, does not mount the host Docker socket, and publishes no OpenBot port.
   Back up the complete app data folder before upgrades.
 releaseNotes: >-
-  Fix Umbrel update installation: store the dedicated AppArmor policy under hooks/,
-  which the Umbrel app updater copies. Keep AppArmor enforcement and Docker seccomp.
+  Open the OpenBot Web App directly from the Umbrel dock; no more setup launcher.
+  Keep the existing self-hosted engine, data, AppArmor policy and Docker isolation.
 developer: Nightly Labs
 website: https://openbot.run
 dependencies: []
