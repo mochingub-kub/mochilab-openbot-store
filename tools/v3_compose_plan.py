@@ -74,6 +74,49 @@ def parse(yaml, source):
     return docs[0]
 
 
+
+def expect_false(yaml, node, field):
+    if (
+        not isinstance(node, yaml.ScalarNode)
+        or node.tag != "tag:yaml.org,2002:bool"
+        or node.value.lower() != "false"
+    ):
+        reject("INVALID_FALSE_" + field)
+
+
+def check_umbrel_data_volume(yaml, node):
+    """Validate original short bind or UmbrelOS's managed long bind mapping.
+
+    UmbrelOS App.patchComposeFile() may redirect the source to APP_DATA_ROOT
+    and replace a short volume with type/source/target/read_only/bind fields
+    to prevent Docker silently creating a missing host directory.
+    No host paths, mount source or credentials are printed by this validator.
+    """
+    if isinstance(node, yaml.ScalarNode):
+        original = scalar(yaml, node, "VOLUME")
+        if original not in (
+            "${APP_DATA_DIR}/data:/data",
+            "${APP_DATA_ROOT}:/data",
+        ):
+            reject("DATA_VOLUME_MAPPING_DRIFT")
+        return
+
+    longform = mapping(yaml, node, "VOLUME")
+    if set(longform) != {"type", "source", "target", "read_only", "bind"}:
+        reject("VOLUME_MAPPING_FIELDS_UNEXPECTED")
+    if scalar(yaml, longform["type"], "VOLUME_TYPE") != "bind":
+        reject("VOLUME_TYPE_DRIFT")
+    if scalar(yaml, longform["source"], "VOLUME_SOURCE") != "${APP_DATA_ROOT}":
+        reject("VOLUME_SOURCE_DRIFT")
+    if scalar(yaml, longform["target"], "VOLUME_TARGET") != "/data":
+        reject("VOLUME_TARGET_DRIFT")
+    expect_false(yaml, longform["read_only"], "VOLUME_READ_ONLY")
+    bind = mapping(yaml, longform["bind"], "VOLUME_BIND")
+    if set(bind) != {"create_host_path"}:
+        reject("VOLUME_BIND_OPTIONS_DRIFT")
+    expect_false(yaml, bind["create_host_path"], "VOLUME_CREATE_HOST_PATH")
+
+
 def compose_targets(yaml, source):
     root = mapping(yaml, parse(yaml, source), "ROOT")
     services = mapping(yaml, root.get("services"), "SERVICES")
@@ -93,11 +136,7 @@ def compose_targets(yaml, source):
     vols = openbot.get("volumes")
     if not isinstance(vols, yaml.SequenceNode) or len(vols.value) != 1:
         reject("VOLUME_LAYOUT_DRIFT")
-    volume = scalar(yaml, vols.value[0], "VOLUME")
-    # Avoid printing host data paths; allow source rewrites by Umbrel only if
-    # there remains a single bind to the intended persistent /data destination.
-    if not volume.endswith(":/data") or volume.count(":") != 1:
-        reject("DATA_VOLUME_MAPPING_DRIFT")
+    check_umbrel_data_volume(yaml, vols.value[0])
     opts = openbot.get("security_opt")
     if not isinstance(opts, yaml.SequenceNode) or len(opts.value) != 3:
         reject("SECURITY_OPT_LAYOUT_DRIFT")
