@@ -6,7 +6,7 @@ APP_DIR="${APP_DATA_DIR:-$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")}"
 SECCOMP="${APP_DIR}/seccomp-0.49.0.json"
 SECCOMP_URL="https://raw.githubusercontent.com/nightly-labs/openbot/v0.49.0/docker/seccomp.json"
 SECCOMP_GIT_SHA="6e42d0bd8e904f5ddddaf3c6c7c50f1dc2d72418"
-APPARMOR_PROFILE="${APP_DIR}/security/mochilab-openbot.apparmor"
+APPARMOR_PROFILE="${APP_DIR}/hooks/mochilab-openbot.apparmor"
 APPARMOR_GIT_SHA="fc27398ef8a2404f2c2f0ef7e6aaab411a9ec73a"
 
 # The upstream profile is a pinned release artifact; do not use unconfined.

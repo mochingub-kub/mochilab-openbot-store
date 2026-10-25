@@ -29,6 +29,10 @@ Do not paste one-time codes, API keys, or credentials into issues or chats.
 - Preserve the entire `/data` recovery unit (database, keyring, keyring password, provider sessions) in an **independent backup** before upgrades or removing the app.
 - Do not change the image to `latest` or downgrade its database. Verify a compatible backup and restore before upgrading.
 
+## UmbrelOS update packaging note
+
+On umbrelOS 2.0, app updates copy only selected package paths, including `hooks/`. They do **not** automatically copy arbitrary new directories. Package `0.49.0-1` mistakenly stored its AppArmor profile in `security/`, so OpenBot could not start after updating. Package `0.49.0-2` places the verified policy in `hooks/` and the `pre-start` hook loads that exact file. **Host AppArmor loading and OpenBot login still need real-device validation.**
+
 ## Validation status
 
 Manifest YAML, Compose YAML, and hook syntax checked statically. The upstream seccomp Git blob SHA and launcher image digest were checked against upstream sources. **Fresh install, GHCR image pull, sign-in, functional test, persistence across restart, and backup/restore have NOT yet been tested on this Umbrel device.**
