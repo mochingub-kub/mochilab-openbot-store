@@ -104,6 +104,21 @@ Root cause is a packaging typo in `tools/lab-bwrap-tmpfs.sh`: the generated cont
 **Safety checkpoint before retesting:** administrator must confirm the previous lab profile name `mochilab-openbot-bwrap-tmpfs-lab` is NOT loaded and no `mochilab-bwrap-tmpfs` disposable Docker container remains. A clean shell prompt does not prove profile unloading; the previous trap attempted removal but printed no success marker. If either remains, stop and inspect before continuing. Do not remove `mochilab-openbot` (the production profile).
 
 After verifying cleanup and pulling the corrected Draft PR branch, rerun `--prepare`, then `--run` only with interactive administrator confirmation and no active Agent tasks. A future successful `--run` still requires review of the actual new mount operation and actual Codex functional tests; this patch does not touch Production or enable app upgrade.
+## AppArmor parser-only grammar checkpoint
+
+Following the owner's Lab proof that mount propagation and tmpfs passed but bubblewrap v0.9.0 failed at `setting up newroot bind: Operation not permitted`, the next low-risk checkpoint is a **parser-only** validation of a hypothetical recursive bind rule. This does not grant new mount privileges or assert the security of the candidate.
+
+`tools/check-bwrap-rbind-grammar.sh` reads the existing installed OpenBot AppArmor policy, constructs a uniquely named transient profile under `/tmp`, and uses `apparmor_parser -Q -T -K` to parse it **without kernel loading**. It does not run Docker, restart an app, stop an agent, touch `/data`, modify an installed profile, or broaden Linux capabilities. It deletes the temporary test profile after execution. The script intentionally does not print policy contents, credentials, or secret paths.
+
+On the UmbrelOS Host SSH:
+
+```sh
+git -C /tmp/mochilab-openbot-workspace-review pull --ff-only
+bash -n /tmp/mochilab-openbot-workspace-review/tools/check-bwrap-rbind-grammar.sh
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/check-bwrap-rbind-grammar.sh
+```
+
+Expected output: `RESULT=RBIND_RULE_GRAMMAR_ACCEPTED`. This only establishes AppArmor *syntax*, not that the kernel grants the real bind operation, nor that the overall nested Codex bubblewrap is safe. Stop if the source profile layout changed or parsing fails. Do not use these grammar candidate rules in Production. Continue with a separate, reviewed and explicitly consented Lab test or seek an upstream-supported container sandbox path.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
