@@ -138,6 +138,19 @@ sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-newroot.sh --pr
 Only after parser check and operator review, run `sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-newroot.sh --run` and confirm `RUN-LAB` at the terminal. Result `NEWROOT_BIND_ADVANCED_TO_PIVOT_ROOT` is a diagnostic milestone only; `pivot_root` and other operations are still denied. Watch for `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. Stop and report any failure/leftover profile; never touch the production AppArmor profile.
 
 Before any further mount exceptions, re-evaluate whether a secure production design is possible without expanding the host kernel attack surface. A working bwrap call is NOT enough to prove write containment or confidentiality.
+## Pivot-root parser evidence and scope decision (25 Oct 2026)
+
+The owner executed a grammar-only variant of the installed OpenBot AppArmor profile with a scoped candidate `pivot_root oldroot=/tmp/oldroot/ /tmp/,`. Reported output was `RESULT=PIVOT_GRAMMAR_PASS`, `KERNEL_POLICY_CHANGED=NO`, `PRODUCTION_CHANGED=NO` and `SHELL_OK`. This proves the parser accepts syntax, **not** that a confined process can use `pivot_root`. The command did not load policy; no production permissions changed.
+
+Previously the isolated `lab-bwrap-newroot.sh --run` produced `USERNS_EXIT=0`, `bwrap: pivot_root: Operation not permitted`, `RESULT=NEWROOT_BIND_ADVANCED_TO_PIVOT_ROOT; NOT A FULL SANDBOX PASS`, and `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. The installed upstream seccomp profile has default `SCMP_ACT_ERRNO` and no explicit `pivot_root` allowance.
+
+Source review of upstream bubblewrap **v0.9.0** `bubblewrap.c` identifies **two separate** pivot_root calls: an initial `pivot_root(base_path, "oldroot")` with base_path `/tmp`, and a later `pivot_root(".", ".")` from `/newroot`. Between them, bubblewrap also attempts an `MS_PRIVATE|MS_REC` propagation mount on oldroot and `umount2(..., MNT_DETACH)`, followed by more setup operations. A parser pass for a single pivot-root rule therefore does not constitute a complete viable sandbox design. See https://github.com/containers/bubblewrap/blob/v0.9.0/bubblewrap.c.
+
+**Decision:** Do not extend production Seccomp/AppArmor with a general pivot_root allowance, extra mount exceptions, unconfined policy, or elevated capabilities merely to advance to the next error. Any further syscall-level Lab experiment requires a separate reviewed threat model of the full Bubblewrap sequence, proof of isolation including denied outside-workspace writes, and an explicit operator checkpoint; it is not authorized by this parser-only result.
+
+**Current usable workflow:** Codex may create reviewed GitHub branches/commits/Draft PRs through the scoped GitHub Connector; the prior read/write smoke test passed. This does NOT mean local Codex Workspace only works or provides read isolation. OpenBot production remains pinned at 0.49.0-3, and the separate 0.50.0 upgrade/backup preparation stays on hold.
+
+**Status:** `CODEX_LOCAL_WORKSPACE_ONLY=BLOCKED; PIVOT_ROOT_GRAMMAR=PASS; ISOLATION_ACCEPTANCE=NOT_TESTED`. No further SSH change requested at this checkpoint.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
