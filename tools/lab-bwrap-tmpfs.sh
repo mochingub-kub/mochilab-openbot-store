@@ -67,7 +67,12 @@ workdir=$(mktemp -d /tmp/mochilab-tmpfs.XXXXXX)
 lab_profile_file="$workdir/lab.apparmor"
 lab_seccomp_file="$workdir/first-two-mount-seccomp.json"
 lab_log="$workdir/result.txt"
-lab_container="mochilab-bwrap-tmpfs-$(date +%s)-$"
+lab_container="mochilab-bwrap-tmpfs-$(date +%s)-${BASHPID}"
+# Fail before loading any host policy if the disposable container name is invalid.
+if [[ ! "$lab_container" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+  echo 'BLOCKED: invalid generated disposable lab container name' >&2
+  exit 2
+fi
 profile_loaded=0
 cleanup() {
   # The owned lab container is the only Docker object this script may remove.
@@ -87,7 +92,13 @@ cleanup() {
       echo "Lab policy source retained: $lab_profile_file" >&2
       return
     fi
+    if grep -Fq "$lab_profile (" "$profiles"; then
+      echo "WARNING: lab AppArmor profile still loaded after unload attempt" >&2
+      echo "Lab policy source retained: $lab_profile_file" >&2
+      return
+    fi
     profile_loaded=0
+    echo 'LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED'
   fi
   rm -rf -- "$workdir"
 }
@@ -187,7 +198,7 @@ cat "$lab_log"
 if (( rc == 124 || rc == 137 )); then
   echo 'RESULT=LAB_TIMEOUT; no verdict'
 elif (( rc != 0 )); then
-  echo "RESULT=LAB_CONTAINER_ERROR code=$rc"
+  echo "RESULT=LAB_CONTAINER_ERROR code=$rc; no bwrap result from this run"
 elif grep -Fq 'Failed to make / slave' "$lab_log"; then
   echo 'RESULT=FIRST_MOUNT_REGRESSION; inspect effective AppArmor rule'
 elif grep -Fq 'Failed to mount tmpfs' "$lab_log"; then

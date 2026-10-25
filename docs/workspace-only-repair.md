@@ -95,6 +95,15 @@ sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-tmpfs.sh --run
 Confirm by typing `RUN-LAB` only when no Agents are busy. This is a temporary host security-policy load despite no production app restart or profile replacement. The script attempts to unload its own lab profile automatically. If it displays WARNING or BLOCKED, stop and check for the distinct lab profile name; never remove or change the production `mochilab-openbot` profile. Never paste secrets.
 
 An output of `RESULT=TMPFS_ADVANCED_TO_NEWROOT_BIND` means another operation was reached, not a passed sandbox. Keep PR in draft. Do not upgrade the engine or app package until security and functional gates are satisfied.
+## Lab script correction: invalid Docker container name (25 Oct 2026)
+
+Operator result: the first+tmpfs AppArmor candidate parsed successfully and the distinct lab profile loaded in enforce mode. **Docker refused to create the disposable container** with `Invalid container name (mochilab-bwrap-tmpfs-1792941442-$)`, Docker exit 125. This is not evidence about whether the tmpfs rule is correct. No tmpfs Bubblewrap execution took place.
+
+Root cause is a packaging typo in `tools/lab-bwrap-tmpfs.sh`: the generated container name ended with a literal `$` instead of a process ID. The fix uses `${BASHPID}` for a numeric suffix, validates the name before loading AppArmor, and confirms profile cleanup visibly after the trial. The production app files/policy remain untouched.
+
+**Safety checkpoint before retesting:** administrator must confirm the previous lab profile name `mochilab-openbot-bwrap-tmpfs-lab` is NOT loaded and no `mochilab-bwrap-tmpfs` disposable Docker container remains. A clean shell prompt does not prove profile unloading; the previous trap attempted removal but printed no success marker. If either remains, stop and inspect before continuing. Do not remove `mochilab-openbot` (the production profile).
+
+After verifying cleanup and pulling the corrected Draft PR branch, rerun `--prepare`, then `--run` only with interactive administrator confirmation and no active Agent tasks. A future successful `--run` still requires review of the actual new mount operation and actual Codex functional tests; this patch does not touch Production or enable app upgrade.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
