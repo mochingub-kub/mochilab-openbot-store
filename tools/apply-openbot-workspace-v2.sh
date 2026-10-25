@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# V2 retired: strict hash of UmbrelOS-managed docker-compose.yml is invalid.
+# Never stage this candidate as it replaces the live generated Compose file.
+printf 'BLOCKED=V2_RETIRED_UMBREL_RUNTIME_COMPOSE_REQUIRES_SEMANTIC_PATCH\n' >&2
+exit 2
 # Mochilab OpenBot Workspace only -- UmbrelOS 2.x compatible manual checkpoints.
 # This script NEVER starts/stops apps itself. Lifecycle is through Umbrel MCP only.
 # --check     read-only inspection while OpenBot is RUNNING
