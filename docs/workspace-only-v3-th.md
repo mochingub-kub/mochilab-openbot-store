@@ -130,3 +130,17 @@ Artifact hash ใช้ตรวจความถูกต้องของ Ap
 ยังไม่พิสูจน์: implementation ของ semantic YAML/hook editor, static parser/test execution, apply/rollback/crash recovery, policy safety, Codex functional tests, read isolation และ persistence ทุกเคสข้างต้นยัง NOT_RUN ไม่มี V3 deploy executable ที่ผ่านทดสอบใน PR นี้
 
 Production ไม่ได้ถูกแก้โดยงานนี้ และยังไม่ถือว่าซ่อมสำเร็จจนกว่าจะมี implementation V3 ที่ review แล้ว ติดตั้งโดยผู้ดูแล และ Functional Test ผ่านจริง
+
+## Read-only Compose planner prototype (ยังไม่ใช่ Installer)
+
+เพิ่ม `tools/v3_compose_plan.py` และ `tools/test_v3_compose_plan.py` เป็น **เครื่องมือออกแบบ/ตรวจสอบเบื้องต้นเท่านั้น** ใช้ Python และ PyYAML parser node offsets เพื่อจำลองแก้ scalar เพียง 2 จุดในหน่วยความจำ โดยไม่เขียนไฟล์ ไม่เริ่ม/หยุด Docker และไม่อ่านหรือแสดง credentials
+
+ทดสอบจากไฟล์จำลองในสภาพแวดล้อมแยกแล้ว **14/14 กรณีผ่าน** (รวม container_name ที่ Umbrel เติม, comments/quotes, source volume ที่ถูกเปลี่ยน, duplicate keys, anchors, หลาย YAML documents และ drift ที่ต้องปฏิเสธ) ไม่มีการรันกับ Compose จริงของ Mochilab
+
+ตัวโปรแกรมใช้การตรวจแบบ fail-closed และพิมพ์เฉพาะผลตรวจ ไม่พิมพ์ environment หรือเนื้อหา Compose ทั้งไฟล์ หาก PyYAML ไม่พร้อม ให้แสดง `BLOCKED=PY_YAML_NOT_INSTALLED_NO_AUTO_INSTALL` แทนการติดตั้ง package บน Host เอง
+
+คำสั่งทดสอบในระบบแยกที่มี PyYAML: `python3 -m unittest -v tools/test_v3_compose_plan.py`
+
+การรันแบบอ่านอย่างเดียวบน UmbrelOS Host (หลังตรวจที่มาสคริปต์และ PyYAML): `sudo python3 tools/v3_compose_plan.py` โดยต้องเรียกจาก checkout ของ **branch V3** ไม่ใช่ branch PR #1 ตัวโปรแกรมจะไม่สร้างไฟล์ output และจะไม่เปลี่ยนค่าจริง
+
+**ข้อจำกัด**: เช็กเฉพาะ YAML ของ Compose ฉบับเดียว ยังไม่ได้ตรวจ effective overrides, Umbrel app lifecycle, ไฟล์ Hook, AppArmor/Seccomp ใน Kernel, backup, restore หรือการทำงานจริงของ Agent จึงยัง `NOT_DEPLOYABLE`. ไม่ใช้ `RESULT=V3_COMPOSE_READ_ONLY_PLAN_PASS` เป็นเงื่อนไขให้หยุด OpenBot หรือ Apply Production
