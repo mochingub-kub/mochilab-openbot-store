@@ -1,0 +1,83 @@
+# Codex Workspace only: repair review, not a deployment
+
+Status: PREPARED / BLOCKED_FOR_POLICY_VALIDATION. No runtime repair or security certification.
+
+Target: OpenBot engine 0.49.0, Mochilab package 0.49.0-3 on UmbrelOS, Codex on Linux. Do not change any agent's model, account, access, Computer Use or Backup models as part of this patch. Existing Gemini/Antigravity agents are not migrated automatically. Use an owner-selected Codex agent for subsequent Workspace only tests.
+
+## Evidence
+
+Reviewed repository baseline: ace1bd751322c7724ffb9098acb6401c0cc5459b.
+
+- Compose selects seccomp-0.49.0.json, AppArmor mochilab-openbot and no-new-privileges. The only OpenBot data mount is its own persistent /data; no Docker socket is mounted.
+- The inspected installed seccomp has default errno EPERM. Its mount/umount2 rules require outer-container CAP_SYS_ADMIN, which the inspected process does not have; pivot_root is absent. The extra unconditional rule admits clone/unshare only.
+- Unprivileged user namespace creation succeeds. Mount namespace setup and bubblewrap fail with Operation not permitted before the payload runs. Installed bubblewrap reports 0.9.0.
+- The repository AppArmor policy explicitly contains `deny mount,`. The running process has label `mochilab-openbot (enforce)`. The complete loaded host policy has not been exported, so repository content alone does not prove its loaded byte-for-byte identity.
+- Upstream v0.49.0 explicitly documents Codex Workspace only in containers as untested, with the same mount, pivot_root and AppArmor blockers.
+- pre-start verifies the upstream seccomp Git blob and rewrites a modified copy. Editing the installed JSON by hand will not survive the hook.
+- pre-start loads AppArmor only when the named enforce profile is absent. A future policy update must account for the already-loaded same-name profile; otherwise a new disk file can coexist with an old loaded policy.
+
+Sources:
+- https://github.com/nightly-labs/openbot/blob/v0.49.0/docs/docker.md#not-confirmed
+- https://github.com/mochingub-kub/mochilab-openbot-store/blob/ace1bd751322c7724ffb9098acb6401c0cc5459b/mochilab-openbot/hooks/pre-start
+- https://github.com/mochingub-kub/mochilab-openbot-store/blob/ace1bd751322c7724ffb9098acb6401c0cc5459b/mochilab-openbot/hooks/mochilab-openbot.apparmor
+- https://github.com/containers/bubblewrap/blob/v0.9.0/bubblewrap.c
+
+## Security decision
+
+Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
+
+AppArmor explicit deny rules take precedence over matching allows. Appending an allow while keeping `deny mount,` cannot repair this. Removing that deny and allowing every mount would discard an existing boundary. Rules must be designed from the actual mount operations/flags/filesystem types/targets and the host kernel/AppArmor features. Paths and flags alone must not be described as proof of namespace-specific authority.
+
+The repository's broad `file,` permission and the app-owned /data mount also mean a working write sandbox is not proof of read confidentiality. Shared, other-agent data, provider sessions and browser data require separate checks. No real credential content should be read for those tests.
+
+If a sufficiently narrow policy cannot be demonstrated on this exact host, keep Workspace only command execution BLOCKED and consider an administrator-managed isolated instance/VM as a separately approved design. Do not silently move workload, grant host access or introduce a new service.
+
+## Work the maintainer can prepare now
+
+This PR adds read-only host audit and a gated functional test script, with no active security-policy, Compose, hook, image or app-version change. Neither script runs automatically. Do not wire either into pre-start or give AI agents a host executor.
+
+Run `tools/audit-workspace-host.sh /verified/path/to/installed/app` from the administrator's host terminal. It inspects selected Docker security fields and policy files, not environment variables or credentials. Capture current host kernel/AppArmor versions and matching denial logs through the administrator's authorized tools. Do not publish raw system logs or unrelated host paths without review.
+
+Before a security-policy patch can be promoted:
+1. Capture the exact installed Codex sandbox invocation and its required syscalls on a disposable staging copy with dummy data, same kernel, Docker, AppArmor and image. Never execute a second copy against the live /data identity.
+2. Trace namespace creation, mount/umount2/pivot_root and any additional rejected operations. Do not allow unrelated syscalls from the upstream CAP_SYS_ADMIN block.
+3. Prepare an OpenBot-specific reviewed seccomp artifact and AppArmor policy. Account for explicit denies and existing proc/sys restrictions. Keep default-deny seccomp and enforced AppArmor, no-new-privileges and host mount boundaries.
+4. Test positive operations and intended negative controls in staging. Record residual kernel exposure; a successful mount alone is not isolation proof.
+5. Review before changing production. No privileged, CAP_SYS_ADMIN grant, unconfined policy, --no-sandbox or Full access escape hatch.
+
+The actual policy amendment is deliberately NOT INCLUDED until those observations exist. These documents and tools are a repair-preparation patch, not a complete runtime repair.
+
+## Durable packaging requirements for the later reviewed policy patch
+
+- Vendor versioned policy artifacts under hooks/, which this Umbrel updater copies. Do not rely on arbitrary new top-level directories being copied on update.
+- Keep the exact upstream seccomp as a verified input and produce or vendor a separately named, reviewed derived artifact. Validate both hashes. Update Compose to select that derived artifact explicitly. Never edit the upstream file in place while pre-start restores its old hash.
+- A host-only hook must parse AppArmor without kernel/cache mutation first, then deliberately replace only the named OpenBot policy when installing a changed reviewed artifact. Do not infer its content merely from its profile name. Consider that replacing a loaded same-name profile affects current processes; use an operator-controlled maintenance window.
+- Atomically publish verified artifacts and fail closed on missing/mismatched artifacts. Preserve originals for rollback. Hooks must never evaluate agent-controlled files from /data as host code or policy.
+- Version the package only when a reviewed policy change is ready. Pin image/version and hashes. On later engine updates, re-evaluate upstream seccomp, Codex/bwrap requirements and the host test matrix. Restart/update persistence remains unverified until actually tested.
+
+## Administrator deployment responsibilities
+
+The administrator, not an AI agent, edits/reviews host policy, loads AppArmor and recreates the affected container. Connected Umbrel tools expose root configuration as read-only and do not provide host command execution. This PR does not change that boundary.
+
+Before deployment: inspect active and queued agent tasks; require idle, preserve IDs and agent settings, retain paused routine states, make and verify an independent consistent backup of the complete /data recovery unit including keyring/session material without exposing it. Save effective Compose, original policies, hashes and image identity. No data migration is required by this proposal.
+
+Docker loads seccomp when a container is created; restarting only the OpenBot process is insufficient. Recreate only the app through supported Umbrel lifecycle controls, with the same persistent data and settings, after approval. Plan brief downtime. Do not restart the Docker daemon or other Mochilab apps.
+
+## Functional acceptance after administrator installation
+
+Use one explicitly selected existing Codex agent with Workspace only. Record provider/account/model/effort/access/Computer Use/backup/routine values before and after via native read_agent. There is no model switch in this preparation patch.
+
+1. Minimal bubblewrap payload works in the repaired container without adding outer capabilities. Then test the actual Codex exec tool, not just a host docker-exec stand-in.
+2. Through that actual restricted tool, run tools/check-workspace-files.sh with explicit synthetic locations supplied by the administrator. It writes only synthetic test material and reports a failure if an outside-workspace write unexpectedly succeeds. Inspect the real denial; a missing directory or ordinary file permissions is not proof of sandbox enforcement.
+3. The administrator must provision an outside canary that the underlying UID can normally write, and verify it from the container outside the agent sandbox. The restricted command must fail there. Do not grant new host mounts for a test.
+4. Separately test supplied synthetic readable canaries in Shared, a disposable other-agent location and a disposable credentials-like location. Log only READABLE/BLOCKED, never contents. Record that these probes do not certify all files in a class. Never read real credentials or ask a model to enumerate secrets.
+5. Confirm default models/permissions/Computer Use/backups unchanged and team routines paused. Run DATA's exact fixture and BUILDER's validator cases only after the runtime gate passes.
+6. With idle work and verified backup, repeat after container recreation, host restart and a reviewed package-update rehearsal. These checks require administrator action; do not claim persistence from static files.
+
+No PRODUCTION_READY result until required positive/negative checks and company-data authorization pass. TOOLBOX remains BLOCKED pending effective read isolation, regardless of write-sandbox results.
+
+## Rollback and remaining risks
+
+For this preparation-only PR rollback has no runtime action: no production settings changed. For a future deployed policy, restore the saved reviewed original artifacts and effective configuration, reload only the named policy and recreate the affected app. Confirm unchanged /data and agent IDs. Never downgrade a migrated database; a security-policy rollback is distinct from restoring data or engine versions.
+
+Risks include greater kernel surface from namespace/mount access, overly broad AppArmor rules, a stale loaded policy, dropped overrides on package updates, downtime/unfinished work during recreation, and read access across /data despite write restrictions. Mitigations need measured tests, not model assurances. Token cost/quota/savings are not measured by this repair work.
