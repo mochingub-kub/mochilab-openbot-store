@@ -24,6 +24,7 @@ services:
     restart: unless-stopped
     security_opt:
       - seccomp=${APP_DATA_DIR}/seccomp-0.49.0.json
+      - apparmor=mochilab-openbot
       - no-new-privileges:true
     shm_size: 1g
     stop_grace_period: 60s
@@ -31,4 +32,4 @@ services:
     cpus: "4.0"
     volumes:
       - ${APP_DATA_DIR}/data:/data
-    # No host ports, privileged mode, host mounts, or Docker socket.
+    # Named AppArmor policy permits userns create, keeping Docker defaults elsewhere.
