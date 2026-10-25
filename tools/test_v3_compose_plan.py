@@ -30,8 +30,10 @@ class Cases(unittest.TestCase):
         with self.assertRaises(Blocked): simulate(s)
     def test_patched_runtime_compose(self):
         self.assertEqual(len(simulate(BASE)),64)
-    def test_volumes_may_have_runtime_source(self):
-        self.assertEqual(len(simulate(BASE.replace('${APP_DATA_DIR}/data:/data','/media/umbrel-data/openbot:/data'))),64)
+    def test_unreviewed_runtime_host_path_denied(self):
+        self.check_block(BASE.replace('${APP_DATA_DIR}/data:/data','/media/umbrel-data/openbot:/data'))
+    def test_umbrel_data_root_short_form_passes(self):
+        self.assertEqual(len(simulate(BASE.replace('${APP_DATA_DIR}/data:/data','${APP_DATA_ROOT}:/data'))),64)
     def test_no_changes_to_comments_or_whitespace(self):
         self.assertEqual(len(simulate(BASE.replace('    volumes:', '\n    # preserve original comment\n    volumes:'))),64)
     def test_unpinned_image_rejected(self):
