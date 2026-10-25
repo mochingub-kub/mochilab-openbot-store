@@ -1,5 +1,7 @@
 # Mochilab OpenBot Community App Store
 
+> **Workspace only repair: V2 ห้ามใช้ deploy production.** Exact hash ของ compose เทียบ repo ใช้ไม่ได้กับไฟล์ runtime ที่ Umbrel ปรับ เช่น container_name ห้าม copy repo compose ทับไฟล์จริง อ่าน [ประกาศ retire V2](docs/workspace-only-v2-retired-th.md) และ [แนวทาง V3 semantic patch](docs/workspace-only-v3-th.md) ก่อนดำเนินการ V3 ยังเป็น DESIGN_ONLY ไม่มีการซ่อม production หรือ Functional Test ผ่านจากเอกสารนี้
+
 Private-use packaging published in a public repository for umbrelOS 2.0. Installs **Nightly Labs OpenBot** from https://openbot.run — NOT CopilotKit/OpenBot.
 
 ## Install on Umbrel
