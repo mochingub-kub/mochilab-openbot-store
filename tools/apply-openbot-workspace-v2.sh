@@ -36,8 +36,8 @@ fail() { echo "BLOCKED=$1" >&2; exit 2; }
 require() { command -v "$1" >/dev/null 2>&1 || fail "MISSING_COMMAND_$1"; }
 hash_file() { git hash-object -- "$1"; }
 verify_file() {
-  [[ -f "$1" && ! -L "$1" ]] || fail "FILE_MISSING_OR_SYMLINK"
-  [[ "$(hash_file "$1")" == "$2" ]] || fail "FILE_HASH_DRIFT"
+  [[ -f "$1" && ! -L "$1" ]] || fail "FILE_MISSING_OR_SYMLINK:$(basename "$1")"
+  [[ "$(hash_file "$1")" == "$2" ]] || fail "FILE_HASH_DRIFT:$(basename "$1")"
 }
 check_original() {
   verify_file "$APP/docker-compose.yml" "$OLD_COMPOSE"
