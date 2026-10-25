@@ -4,6 +4,8 @@
 # --check (read only), --apply (offline backup/app recreate/self-test),
 # --rollback BACKUP_DIRECTORY (restore original config only).
 set -Eeuo pipefail
+echo 'BLOCKED=V1_UNSUPPORTED_ON_UMBRELOS_2_USE_TOOLS_APPLY_OPENBOT_WORKSPACE_V2_SH' >&2
+exit 2
 umask 077
 MODE="$1"
 APP_ID=mochilab-openbot
