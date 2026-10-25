@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Prepare the upstream seccomp profile. No host configuration is changed.
+set -euo pipefail
+APP_DIR="${APP_DATA_DIR:-$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")}"
+PROFILE="${APP_DIR}/seccomp-0.49.0.json"
+UPSTREAM="https://raw.githubusercontent.com/nightly-labs/openbot/v0.49.0/docker/seccomp.json"
+# Git blob SHA of the upstream v0.49.0 docker/seccomp.json (not a plain-file SHA-1).
+EXPECTED="6e42d0bd8e904f5ddddaf3c6c7c50f1dc2d72418"
+if [[ -f "$PROFILE" ]] && [[ "$(git hash-object "$PROFILE")" == "$EXPECTED" ]]; then
+  exit 0
+fi
+command -v curl >/dev/null || { echo "OpenBot: curl not found, cannot obtain seccomp profile" >&2; exit 1; }
+command -v git >/dev/null || { echo "OpenBot: git not found, cannot verify seccomp profile" >&2; exit 1; }
+TMP="$(mktemp "${APP_DIR}/.seccomp-0.49.0.XXXXXX")"
+trap 'rm -f "$TMP"' EXIT
+curl --fail --location --silent --show-error --retry 2 --connect-timeout 10 --max-time 60 \
+  "$UPSTREAM" --output "$TMP"
+[[ "$(git hash-object "$TMP")" == "$EXPECTED" ]] || {
+  echo "OpenBot: upstream seccomp profile checksum mismatch, refusing file" >&2
+  exit 1
+}
+chmod 0644 "$TMP"
+mv -f "$TMP" "$PROFILE"

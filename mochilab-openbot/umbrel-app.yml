@@ -1,0 +1,39 @@
+manifestVersion: 1
+id: mochilab-openbot
+storage:
+  dataRoot: data
+category: ai
+name: OpenBot
+tagline: Persistent AI teammates on your Umbrel
+version: "0.49.0"
+description: >-
+  Run the official OpenBot Docker server on your own umbrelOS device.
+  OpenBot works in the background and you connect through the OpenBot web or desktop client.
+  This Umbrel app includes a local start page for the setup instructions and the web client link.
+
+
+  **First-time setup:** after installing, open a terminal on your Umbrel device and run
+  `sudo docker exec -it mochilab-openbot_openbot_1 openbot login`. Sign in with the email
+  code delivered to you, then use https://openbot.run/app with the same account.
+
+
+  OpenBot is a development preview. Its agents can execute commands and edit files within
+  their container without asking for confirmation. The package mounts only the app's own
+  data directory, does not mount the host Docker socket, and publishes no OpenBot port.
+  Back up the complete app data folder before upgrades.
+releaseNotes: >-
+  Initial private Mochilab package, pinned to OpenBot v0.49.0, with local launcher,
+  persistent data, upstream sandbox security profile, and no direct agent port exposure.
+developer: Nightly Labs
+website: https://openbot.run
+dependencies: []
+repo: https://github.com/nightly-labs/openbot
+support: https://github.com/nightly-labs/openbot/issues
+port: 26771
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+icon: https://openbot.run/favicon.ico
+submitter: Mochilab
+submission: ""
