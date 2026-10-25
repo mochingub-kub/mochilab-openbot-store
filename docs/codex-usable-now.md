@@ -6,7 +6,7 @@ Scope: OpenBot package 0.49.0-3 (engine 0.49.0) on UmbrelOS.
 
 ## Verified boundaries
 - The owner reproduced Bubblewrap failures in disposable no-network lab containers. Initial mount propagation and the tmpfs mount both progressed under transient, separate lab-only policies, but the next newroot bind mount was denied.
-- One lab run reported `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. No repaired policy was installed into Production, and no Codex Workspace only positive/negative filesystem test has passed.
+- One lab run reported `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. No repaired policy was installed into Production. The owner subsequently passed an isolated real-Codex 0.164.0 synthetic inside-write/outside-write test. This is NOT an actual OpenBot Agent production test.
 - OpenBot was most recently `ready`, and Codex has completed conversations. Existing OpenBot agents previously created Draft PR #1 through their authorized GitHub workflow.
 - A GitHub API tool running via OpenBot's connector is a distinct authorization boundary from the local Codex command sandbox. It is NOT proof that local files are isolated or that remote repositories are safe from unrelated changes.
 
