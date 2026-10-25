@@ -68,6 +68,33 @@ Check the post-run presence of `mochilab-openbot-bwrap-first-mount-lab` in `/sys
 Expected evidence: if output advances from `Failed to make / slave` to `Failed to mount tmpfs`, the first operation probably passed and the next is blocked. That is diagnostic progress, not Workspace only success. A parse failure means syntax/kernel compatibility unverified; do not force-load a profile. If the result stays on `/ slave`, investigate AppArmor matching and syscall details instead of broadening the rule blindly.
 
 Version note: OpenBot upstream v0.50.0 was released 2026-10-25, but upgrading the engine is separate from repairing the 0.49.0 sandbox. A production engine/package update remains withheld until this lab validation, complete positive/negative Codex tests, independent complete `/data` backup, operator review, and an approved controlled upgrade. Do not run the app update tool as an implicit step in these experiments.
+## Second controlled mount experiment: tmpfs
+
+The owner ran the first-mount lab on the UmbrelOS Host and obtained `PARSER_CHECK=PASS`, `LAB_PROFILE=LOADED_ENFORCE`, `USERNS_EXIT=0`, and `bwrap: Failed to mount tmpfs: Operation not permitted` (`RESULT=FIRST_MOUNT_ADVANCED_TO_TMPFS`). That is proof the first mount advanced to the next operation; it is not a working sandbox.
+
+Bubblewrap 0.9.0 source shows the next operation is `mount("tmpfs", "/tmp", "tmpfs", MS_NODEV | MS_NOSUID, NULL)` immediately after the propagation mount. The separate `tools/lab-bwrap-tmpfs.sh` preserves the previous exact flags-only seccomp rule, and adds only `mount(flags=6)` for tmpfs plus the lab AppArmor rule `mount fstype=tmpfs options=(rw,nosuid,nodev) tmpfs -> /tmp/,`. It is a **lab-only hypothesis**. Whether the host AppArmor policy accepts this precise rule and whether the kernel allows the syscall are not known until run.
+
+Seccomp cannot match source, fstype, target, or namespace; allowing flags=6 affects ALL processes in this disposable container and may not be appropriate for production. No production security artifact, hook, compose or agent permission is changed. A successful tmpfs mount still leaves bind mounts, `pivot_root`, `umount2`, and full Codex isolation untested.
+
+### Operator checkpoint (UmbrelOS Host SSH only; idle maintenance window)
+
+Review the new script in the Draft PR and run each command separately:
+
+```sh
+git -C /tmp/mochilab-openbot-workspace-review pull --ff-only
+less /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-tmpfs.sh
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-tmpfs.sh --prepare
+```
+
+Only if `PARSER_CHECK=PASS` and the operator accepts transient loading of a **distinct** host AppArmor profile, execute:
+
+```sh
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-tmpfs.sh --run
+```
+
+Confirm by typing `RUN-LAB` only when no Agents are busy. This is a temporary host security-policy load despite no production app restart or profile replacement. The script attempts to unload its own lab profile automatically. If it displays WARNING or BLOCKED, stop and check for the distinct lab profile name; never remove or change the production `mochilab-openbot` profile. Never paste secrets.
+
+An output of `RESULT=TMPFS_ADVANCED_TO_NEWROOT_BIND` means another operation was reached, not a passed sandbox. Keep PR in draft. Do not upgrade the engine or app package until security and functional gates are satisfied.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
