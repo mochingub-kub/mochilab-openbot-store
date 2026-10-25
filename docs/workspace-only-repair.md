@@ -119,6 +119,25 @@ sudo bash /tmp/mochilab-openbot-workspace-review/tools/check-bwrap-rbind-grammar
 ```
 
 Expected output: `RESULT=RBIND_RULE_GRAMMAR_ACCEPTED`. This only establishes AppArmor *syntax*, not that the kernel grants the real bind operation, nor that the overall nested Codex bubblewrap is safe. Stop if the source profile layout changed or parsing fails. Do not use these grammar candidate rules in Production. Continue with a separate, reviewed and explicitly consented Lab test or seek an upstream-supported container sandbox path.
+## Third controlled mount experiment: newroot bind
+
+Operator confirmed AppArmor parser-only `RBIND_RULE_GRAMMAR_ACCEPTED` with `APPARMOR_LOADED=NO`. Earlier isolated lab passed propagation and tmpfs before `setting up newroot bind: Operation not permitted`; that Lab reported `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. None of this is a working Codex sandbox.
+
+`tools/lab-bwrap-newroot.sh` is a NEW separately named AppArmor enforcing Lab profile, `mochilab-openbot-bwrap-newroot-lab`, and a temporary derived seccomp profile. It preserves the previous two mount flag exceptions and adds an exact third `mount(flags=0xC0EDD000)` for bubblewrap 0.9.0 `mount("newroot","newroot",NULL,MS_SILENT|MS_MGC_VAL|MS_BIND|MS_REC,NULL)`. Lab AppArmor adds `mount options=(rw,rbind,silent) /tmp/newroot/ -> /tmp/newroot/,`. It only operates on the disposable container, never the running production profile.
+
+**Important risk:** seccomp can match the flags, not the mount source/target pathname or specific user namespace. This flags-only exception is **not a production policy**. The Lab has network disabled, no Host bind mounts, no Docker socket, no persistent or host data, no new capabilities, no privileged mode, enforced AppArmor, 512 MiB RAM/one CPU/PID limit, read-only image filesystem, UID 1000, and ephemeral tmpfs. This experiment must not be repurposed for production access.
+
+On UmbrelOS Host SSH only, with idle Agents, update and review:
+
+```sh
+git -C /tmp/mochilab-openbot-workspace-review pull --ff-only
+bash -n /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-newroot.sh
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-newroot.sh --prepare
+```
+
+Only after parser check and operator review, run `sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-newroot.sh --run` and confirm `RUN-LAB` at the terminal. Result `NEWROOT_BIND_ADVANCED_TO_PIVOT_ROOT` is a diagnostic milestone only; `pivot_root` and other operations are still denied. Watch for `LAB_PROFILE_CLEANUP=CONFIRMED_REMOVED`. Stop and report any failure/leftover profile; never touch the production AppArmor profile.
+
+Before any further mount exceptions, re-evaluate whether a secure production design is possible without expanding the host kernel attack surface. A working bwrap call is NOT enough to prove write containment or confidentiality.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
