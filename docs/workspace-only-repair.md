@@ -45,6 +45,29 @@ Interpretation: basic user namespaces work but bubblewrap's first mount propagat
 An Umbrel MCP read of a bounded recent system journal found no `apparmor="DENIED"` / mount audit entries matching this test. That is NOT evidence that the loaded AppArmor policy allows mount; explicit denies can be silent, and loaded-profile bytes remain unverified.
 
 Next gate: review the exact permitted mount operations under a disposable **distinct** AppArmor lab profile, if and only if the operator approves a temporary host policy load and has a rollback. A staging-only experiment is not production approval. Any candidate must keep no host bind mounts, no production data, no network, no privileged/CAP_SYS_ADMIN and no unconfined security settings. Do not merge this PR or update production until Codex Workspace only functionality and positive/negative filesystem isolation tests pass.
+## Strict first-mount AppArmor/Seccomp Lab
+
+After the owner reproduced the baseline with `BWRAP_EXIT=1` and `Failed to make / slave`, the next investigative experiment is only the FIRST bubblewrap mount propagation syscall. This is not a repair candidate for production.
+
+`tools/lab-bwrap-first-mount.sh` generates in `/tmp` a derived Seccomp policy with exactly one added conditional mount exception (syscall `mount`, flags index 3 equals `MS_SILENT | MS_SLAVE | MS_REC`, decimal 573440) and a distinct AppArmor lab profile named `mochilab-openbot-bwrap-first-mount-lab`. It replaces the original `deny mount` only in that transient lab profile with `mount options=(rslave,silent) /,`. The production profile is never rewritten, replaced, or removed.
+
+These rules have different scopes: Seccomp cannot check mount target path or user namespace, so the first rule still has kernel attack-surface implications, even in the disposable container. AppArmor can check path/flags, but behavior must be verified against the exact host parser/kernel. Because both policy layers apply, a denial by either remains effective. Neither rule is a complete confinement system or proof of agent isolation.
+
+Operator sequence on the **UmbrelOS Host** (not Portainer or an OpenBot agent), from the reviewed Draft PR branch:
+
+```sh
+git -C /tmp/mochilab-openbot-workspace-review pull --ff-only
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-first-mount.sh --prepare
+sudo bash /tmp/mochilab-openbot-workspace-review/tools/lab-bwrap-first-mount.sh --run
+```
+
+Review `tools/lab-bwrap-first-mount.sh` before running `--run`. The `--prepare` mode verifies baseline file hashes and only parses the proposed AppArmor profile; it neither loads it nor launches a container. The `--run` mode REQUIRES interactive confirmation `RUN-LAB`, loads a separately named AppArmor profile in enforce mode, runs a bounded disposable Docker container with no network/host bind mounts/real `/data`/Docker socket, and attempts to remove only its own lab container and lab AppArmor profile afterward. Do not run if active work or if host security profile management is under maintenance.
+
+Check the post-run presence of `mochilab-openbot-bwrap-first-mount-lab` in `/sys/kernel/security/apparmor/profiles` when warned about cleanup. **Never remove `mochilab-openbot`**, only the distinct lab name. On an unexpected failure, stop and preserve the displayed warning; do not try to repair the host by broadening privileges.
+
+Expected evidence: if output advances from `Failed to make / slave` to `Failed to mount tmpfs`, the first operation probably passed and the next is blocked. That is diagnostic progress, not Workspace only success. A parse failure means syntax/kernel compatibility unverified; do not force-load a profile. If the result stays on `/ slave`, investigate AppArmor matching and syscall details instead of broadening the rule blindly.
+
+Version note: OpenBot upstream v0.50.0 was released 2026-10-25, but upgrading the engine is separate from repairing the 0.49.0 sandbox. A production engine/package update remains withheld until this lab validation, complete positive/negative Codex tests, independent complete `/data` backup, operator review, and an approved controlled upgrade. Do not run the app update tool as an implicit step in these experiments.
 ## Security decision
 
 Do not replace the blockers with a generic unconditional mount allow and call it safe. Conventional seccomp syscall-argument rules cannot establish that a process is currently inside a particular user/mount namespace, or inspect mount path strings. An unconditional allow applies to every process in this container. Kernel capability checks remain relevant but are not a substitute for reviewing the expanded attack surface.
