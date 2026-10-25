@@ -35,6 +35,10 @@ A working Bubblewrap container is only the first positive test. A future reviewe
 
 Keep TOOLBOX blocked until read isolation is separately validated. Preserve agent identities, model/effort, routines, account setup and Computer Use settings.
 
+## Profile-split decision (latest Lab)
+
+The owner tested `tools/lab-codex-profile-split.sh --run`: `codex-cli 0.164.0` launched, but `codex sandbox` reported no usable bwrap. `RESULT=CODEX_LAB_FAILED code=73`, and both temporary Lab profiles reported removed. A `Px` transition from mount-denying parent to mount-allowing child is incompatible with retaining `no-new-privileges` unless the new policy is a permitted subset; exact syscall denial was not traced. **This split design is NOT a production fix**. Never disable no-new-privileges to make it pass. OpenBot local Workspace-only remains blocked. See `docs/workspace-only-repair.md` for the evidence and security decision.
+
 ## Upgrade gate
 
 The engine 0.50.0 release exists but its published Docker documentation still describes Workspace only in a container as untested. Do not treat the version bump as the runtime repair. The owner's requested app upgrade remains a separate checkpoint AFTER the stated safety, backup and validation gates; no production app update is part of this documentation PR.

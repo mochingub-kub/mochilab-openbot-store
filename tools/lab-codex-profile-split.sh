@@ -3,6 +3,10 @@
 # Production parent DENY mount persists while /usr/bin/bwrap transitions into
 # an isolated child policy. The whole Docker seccomp permits bwrap syscalls,
 # but AppArmor parent must still block mount. No production policy change.
+# This lab failed on the owner host: Codex could not launch system bwrap under
+# the proposed Px transition, likely due to no-new-privileges blocking
+# escalation from deny mount to allow mount. The failure is NOT a PATH fix.
+# DO NOT disable no-new-privileges to bypass this barrier.
 # Do not use this profile/JSON in production Docker Compose.
 set -euo pipefail
 if (( $# != 1 )) || [[ "$1" != --prepare && "$1" != --run ]]; then
