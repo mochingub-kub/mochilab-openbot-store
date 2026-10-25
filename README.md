@@ -20,10 +20,10 @@ Do not paste one-time codes, API keys, or credentials into issues or chats.
 
 ## Packaging and risks
 
-- OpenBot is pinned to **0.49.0**; this community package is not affiliated with Umbrel or Nightly Labs.
+- OpenBot is pinned to **0.50.0** in this proposed package; this community package is not affiliated with Umbrel or Nightly Labs.
 - The upstream OpenBot container has no published host port. Its only filesystem mount is its own persistent Umbrel app data folder (`/data` inside the container).
 - A separate, unprivileged static NGINX page is available through the Umbrel app proxy on port **26771**. It instantly redirects the dock click to https://openbot.run/app; it does not host the OpenBot Web UI.
-- OpenBot needs its upstream `seccomp.json` profile for the Electron sandbox; an executable `hooks/pre-start` retrieves the exact file from the **v0.49.0** tag and verifies its Git blob SHA. This requires outbound HTTPS, `curl`, and `git` on the Umbrel host.
+- OpenBot needs its upstream `seccomp.json` profile for the Electron sandbox; an executable `hooks/pre-start` retrieves the exact file from the **v0.50.0** tag and verifies its Git blob SHA. This requires outbound HTTPS, `curl`, and `git` on the Umbrel host.
 - No privileged mode, host Docker socket, Cloudflare route, device mount, external HDD, or access to the other Mochilab app folders is configured.
 - This is a **development preview**: AI agents can execute commands and change data within their own container. Do not grant additional host mounts.
 - Preserve the entire `/data` recovery unit (database, keyring, keyring password, provider sessions) in an **independent backup** before upgrades or removing the app.
@@ -41,5 +41,16 @@ The installed Umbrel dock URL remains local and managed by Umbrel. The static re
 
 Manifest YAML, Compose YAML, and hook syntax checked statically. The upstream seccomp Git blob SHA and launcher image digest were checked against upstream sources. **Fresh install, GHCR image pull, sign-in, functional test, persistence across restart, and backup/restore have NOT yet been tested on this Umbrel device.**
 
-Source documentation: https://github.com/nightly-labs/openbot/blob/v0.49.0/docs/docker.md
+Source documentation: https://github.com/nightly-labs/openbot/blob/v0.50.0/docs/docker.md
 Umbrel community stores: https://github.com/getumbrel/umbrel-community-app-store
+
+
+## Prepared 0.50.0 release (not installed until merged/updated)
+
+This proposal changes only the pinned image, manifest version and the verified upstream seccomp download URL. The upstream seccomp Git blob is identical for 0.49.0 and 0.50.0 (6e42d0bd8e904f5ddddaf3c6c7c50f1dc2d72418), so the old on-disk file name seccomp-0.49.0.json is deliberately reused for compatibility. The AppArmor policy, mounts, CPU/RAM limits and network exposure are unchanged.
+
+The developer's release workflow 40199231815 passed the two Docker image builds, publication and anonymous pull verification. This verifies upstream image availability, not installation on Mochilab.
+
+The local in-server recovery folder is NOT a confirmed independent backup. Before the owner merges and applies this proposal, stop OpenBot while idle, make a consistent separate secure full-/data backup including keyring/password/provider sessions, verify it, and confirm the recovery procedure. Upgrading can migrate the database, so an older image cannot simply be restarted against newer data. See docs/upgrade-0.50.0.md.
+
+**Not fixed:** Codex Workspace only in this Linux Docker container still requires separate bubblewrap/security-policy investigation. Do not enable Full access, privileged, CAP_SYS_ADMIN or unconfined as a shortcut.
