@@ -182,6 +182,15 @@ def external_backup_parent(parent):
         fail("INDEPENDENT_MOUNT_NOT_VERIFIED")
     if parent.stat().st_dev == (APP / "data").stat().st_dev:
         fail("BACKUP_ON_SAME_FILESYSTEM")
+    # A separate partition on the same NVMe is not an independent backup.
+    backup_source = run(["findmnt", "-T", str(parent), "-no", "SOURCE"]).split("[")[0]
+    data_source = run(["findmnt", "-T", str(APP / "data"), "-no", "SOURCE"]).split("[")[0]
+    if not backup_source.startswith("/dev/") or not data_source.startswith("/dev/"):
+        fail("BACKUP_BLOCK_DEVICE_UNVERIFIED")
+    backup_parent = run(["lsblk", "-no", "PKNAME", backup_source])
+    data_parent = run(["lsblk", "-no", "PKNAME", data_source])
+    if not backup_parent or not data_parent or backup_parent == data_parent:
+        fail("BACKUP_PHYSICAL_DISK_INDEPENDENCE_UNVERIFIED")
     bytes_used = int(run(["du", "-sb", str(APP / "data")]).split()[0])
     free = shutil.disk_usage(parent).free
     if free <= bytes_used * 1.35 + 1073741824:
