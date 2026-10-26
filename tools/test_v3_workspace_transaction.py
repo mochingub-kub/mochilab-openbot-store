@@ -90,6 +90,35 @@ class Transaction(unittest.TestCase):
         self.assertIn("OPERATOR_CONFIRMATION_MISSING", str(error.exception))
         self.assertFalse(list(self.parent.glob(".mochilab-openbot-v3-*")))
 
+    def test_interrupted_publish_can_restore_exact_original(self):
+        original = tx.atomic_publish
+
+        def fail_before_hook(target, payload, **kwargs):
+            if target.name == "pre-start":
+                raise OSError("synthetic interrupted hook publish")
+            return original(target, payload, **kwargs)
+
+        with mock.patch.object(tx, "atomic_publish", side_effect=fail_before_hook):
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(OSError):
+                    tx.stage(self.parent)
+        transaction, = list(self.parent.glob(".mochilab-openbot-v3-*"))
+        manifest = json.loads((transaction / "manifest.json").read_text())
+        self.assertEqual(manifest["state"], "NEEDS_RECOVERY")
+        with contextlib.redirect_stdout(io.StringIO()):
+            tx.restore(transaction)
+        self.assertEqual((self.app / "hooks/pre-start").read_text(), "old-hooks/pre-start\n")
+        self.assertEqual((self.app / "docker-compose.yml").read_text(), "old-docker-compose.yml\n")
+        self.assertFalse((self.app / tx.NEW_ONLY[0]).exists())
+        self.assertEqual((self.app / "data" / "canary.txt").read_text(), "private test fixture")
+
+    def test_transaction_permissions_are_strict(self):
+        transaction = self.do_stage()
+        transaction.chmod(0o755)
+        with self.assertRaises(tx.Blocked) as error:
+            tx.restore(transaction)
+        self.assertIn("TRANSACTION_OWNERSHIP_OR_PERMISSIONS_UNSAFE", str(error.exception))
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
