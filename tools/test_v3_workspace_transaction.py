@@ -120,6 +120,38 @@ class Transaction(unittest.TestCase):
             tx.restore(transaction)
         self.assertIn("TRANSACTION_OWNERSHIP_OR_PERMISSIONS_UNSAFE", str(error.exception))
 
+    def test_saved_container_baseline_requires_expected_isolation(self):
+        obj = {
+            "State": {"Running": False},
+            "AppArmorProfile": "mochilab-openbot",
+            "HostConfig": {
+                "Privileged": False, "CapAdd": None,
+                "SecurityOpt": [
+                    "apparmor=mochilab-openbot",
+                    "seccomp=/app/seccomp-0.49.0.json",
+                    "no-new-privileges:true",
+                ],
+            },
+            "Config": {
+                "Image": "ghcr.io/nightly-labs/openbot:0.49.0",
+                "Labels": {
+                    "com.docker.compose.project": "mochilab-openbot",
+                    "com.docker.compose.service": "openbot",
+                },
+            },
+            "Mounts": [
+                {"Destination": "/data", "Source": str(self.app / "data"), "RW": True},
+            ],
+        }
+        with mock.patch.object(tx, "docker_info", return_value=obj):
+            original = tx.check_live_baseline
+            original(require_running=False)
+            with self.assertRaises(tx.Blocked):
+                original(require_running=True)
+            obj["HostConfig"]["Privileged"] = True
+            with self.assertRaises(tx.Blocked):
+                original(require_running=False)
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
