@@ -61,6 +61,13 @@ Portainer Docker-in-Docker terminal, Mac or OpenBot Agent.
       Umbrel's /External virtual file-browser path.
    b. Obtain a work-free maintenance window. Stop *only* OpenBot via Umbrel's
       supported app lifecycle, then check every service has stopped.
+      On this umbrelOS app-script, the stop action runs
+      'docker compose rm --force --stop', which REMOVES the app containers
+      while preserving the separately mounted app /data. V3 Stage now
+      requires their absence, rather than trying to inspect a deleted
+      saved container. Run the pinned --check while still running BEFORE
+      stopping OpenBot; the stopped-only stage rechecks the installed
+      Compose and pinned security artifacts.
    c. Run a final stopped-only 'sudo python3 ... --stage BACKUP_PARENT'.
       This asks for 'STAGE-V3' interactively. Before publishing any config,
       it checks separate physical block devices, filesystem support and
