@@ -180,21 +180,24 @@ def check_live_baseline(require_running=True):
 
 
 def check_stopped():
-    info = docker_info()
-    labels = info.get("Config", {}).get("Labels") or {}
-    if labels.get("com.docker.compose.project") != PROJECT:
-        fail("PROJECT_LABEL_DRIFT")
-    states = ("running", "restarting", "paused", "dead")
-    if info.get("State", {}).get("Status", "").lower() in states:
-        fail("OPENBOT_MUST_BE_STOPPED")
-    all_ids = run(["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=" + PROJECT])
-    if not all_ids:
-        fail("APP_CONTAINERS_NOT_IDENTIFIED")
-    for id_ in all_ids.splitlines():
-        obj = json.loads(run(["docker", "inspect", id_]))[0]
-        status = obj.get("State", {}).get("Status", "").lower()
-        if status not in ("created", "exited"):
-            fail("APP_SERVICE_NOT_STOPPED")
+    """Require Umbrel's stopped-and-removed state, never a leftover container.
+
+    In the inspected UmbrelOS app-script, "stop" runs:
+      docker compose rm --force --stop
+    This intentionally removes the app containers but preserves /data. Never
+    infer that a stopped container remains inspectable after an Umbrel stop.
+    """
+    # docker ps -a detects running, paused, restarting and stopped containers.
+    all_ids = run(["docker", "ps", "-aq", "--filter",
+                   "label=com.docker.compose.project=" + PROJECT])
+    if all_ids:
+        fail("APP_CONTAINERS_STILL_PRESENT_AFTER_UMBREL_STOP")
+    # An old or manually created same-name container without correct labels
+    # must also block staging rather than being silently ignored.
+    named = run(["docker", "inspect", "--format", "{{.Id}}", SERVICE],
+                check=False)
+    if named:
+        fail("OPENBOT_NAMED_CONTAINER_STILL_PRESENT")
     return True
 
 
@@ -353,9 +356,10 @@ def restore(path):
 
 
 def stage(parent):
+    # The operator must have run --check while OpenBot was still running.
+    # After an Umbrel stop, Docker removes the app containers, so the saved
+    # runtime inspect object no longer exists. Verify on-disk config again.
     check_stopped()
-    # Preserve and re-check the existing container's saved runtime settings.
-    check_live_baseline(require_running=False)
     source, before, candidate = check_installed()
     artifact_dir = check_artifacts()
     size = external_backup_parent(parent)
