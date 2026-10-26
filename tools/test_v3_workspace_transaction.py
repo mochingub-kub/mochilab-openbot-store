@@ -34,6 +34,7 @@ class Transaction(unittest.TestCase):
         self.addCleanup(self.app_patch.stop)
         self.actual_check_live_baseline = tx.check_live_baseline
         self.actual_check_stopped = tx.check_stopped
+        self.actual_external_backup_parent = tx.external_backup_parent
         self.patchers = [
             mock.patch.object(tx, "check_stopped", side_effect=lambda: True),
             mock.patch.object(tx, "check_live_baseline", side_effect=lambda **_: True),
@@ -283,7 +284,7 @@ class Transaction(unittest.TestCase):
             str(self.parent) + " ext4", "ro,nosuid,nodev"
         ]):
             with self.assertRaises(tx.Blocked) as error:
-                tx.external_backup_parent(self.parent)
+                self.actual_external_backup_parent(self.parent)
         self.assertIn("BACKUP_MOUNT_NOT_READ_WRITE", str(error.exception))
 
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
