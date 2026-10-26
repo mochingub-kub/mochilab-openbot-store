@@ -86,14 +86,22 @@ def check_app():
     compose = (APP / "docker-compose.yml").read_text(encoding="utf-8")
     manifest = (APP / "umbrel-app.yml").read_text(encoding="utf-8")
     d = "$" + "{APP_DATA_DIR}"
-    required = (
-        "image: ghcr.io/nightly-labs/openbot:0.49.0",
-        "apparmor=mochilab-openbot-workspace",
-        "seccomp=" + d + "/seccomp-workspace.json",
-        d + "/data:/data",
-        "no-new-privileges:true",
-    )
-    if not all(line in compose for line in required):
+    checks = {
+        "IMAGE_049": "image: ghcr.io/nightly-labs/openbot:0.49.0" in compose,
+        "APPARMOR_V3": "apparmor=mochilab-openbot-workspace" in compose,
+        "SECCOMP_V3": "seccomp=" + d + "/seccomp-workspace.json" in compose,
+        "DATA_BIND": d + "/data:/data" in compose,
+        "NO_NEW_PRIVILEGES": "no-new-privileges:true" in compose,
+    }
+    if not all(checks.values()):
+        # Report labels only. Do NOT print Compose/environment/security contents.
+        for name, ok in checks.items():
+            print("CHECK_" + name + "=" + ("PASS" if ok else "MISSING"))
+        print("OLD_APPARMOR_SELECTOR_SEEN=" + (
+            "YES" if "apparmor=mochilab-openbot" in compose and
+            "apparmor=mochilab-openbot-workspace" not in compose else "NO"))
+        print("OLD_SECCOMP_SELECTOR_SEEN=" + (
+            "YES" if "seccomp=" + d + "/seccomp-0.49.0.json" in compose else "NO"))
         block("EXPECTED_049_V3_COMPOSE_NOT_FOUND")
     if 'version: "0.49.0-3"' not in manifest:
         block("EXPECTED_049_UMBREL_PACKAGE_NOT_FOUND")
