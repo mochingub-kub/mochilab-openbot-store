@@ -126,9 +126,9 @@ def docker_info():
         fail("DOCKER_INSPECT_UNREADABLE")
 
 
-def check_live_baseline():
+def check_live_baseline(require_running=True):
     info = docker_info()
-    if not info.get("State", {}).get("Running"):
+    if require_running and not info.get("State", {}).get("Running"):
         fail("PRODUCTION_NOT_RUNNING")
     if info.get("AppArmorProfile") != "mochilab-openbot":
         fail("APPARMOR_RUNTIME_DRIFT")
@@ -329,6 +329,8 @@ def restore(path):
 
 def stage(parent):
     check_stopped()
+    # Preserve and re-check the existing container's saved runtime settings.
+    check_live_baseline(require_running=False)
     source, before, candidate = check_installed()
     artifact_dir = check_artifacts()
     size = external_backup_parent(parent)
