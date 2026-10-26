@@ -24,19 +24,23 @@ BACKUP_NAME = re.compile(r"\A\.mochilab-openbot-v3-backup-only-\d{8}-\d{6}-[0-9a
 SCHEMA = "mochilab-openbot-v3-backup-only"
 
 
-def verify_backup(backup):
+def require_root():
     if os.geteuid() != 0:
         tx.fail("RUN_AS_ROOT_ON_UMBREL_HOST")
+
+
+def verify_backup(backup):
+    require_root()
     if not backup.is_absolute() or backup.parent != PARENT or not BACKUP_NAME.fullmatch(backup.name):
         tx.fail("BACKUP_TRANSACTION_PATH_UNEXPECTED")
     if backup.is_symlink() or not backup.is_dir() or backup.resolve(strict=True) != backup:
         tx.fail("BACKUP_TRANSACTION_PATH_UNSAFE")
     st = backup.stat()
-    if st.st_uid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
+    if st.st_uid != os.geteuid() or stat.S_IMODE(st.st_mode) != 0o700:
         tx.fail("BACKUP_TRANSACTION_PERMISSIONS_UNSAFE")
     marker = backup / "manifest.json"
     tx.regular(marker)
-    if marker.stat().st_uid != 0 or stat.S_IMODE(marker.stat().st_mode) != 0o600:
+    if marker.stat().st_uid != os.geteuid() or stat.S_IMODE(marker.stat().st_mode) != 0o600:
         tx.fail("BACKUP_MANIFEST_PERMISSIONS_UNSAFE")
     m = json.loads(marker.read_text(encoding="utf-8"))
     if not isinstance(m, dict) or m.get("schema") != SCHEMA or m.get("app") != str(tx.APP):
