@@ -158,3 +158,18 @@ Production ไม่ได้ถูกแก้โดยงานนี้ แ�
 หากยัง BLOCKED ให้เก็บเฉพาะเหตุผลและตรวจชนิด/ชื่อฟิลด์ใน `volumes` แบบ **ไม่แสดงค่า Source path หรือ Environment** ก่อนปรับกฎอีกครั้ง ห้ามเปลี่ยน live Volume, ปิดการตรวจ Drift หรือ Apply Production เพื่อให้ตัวตรวจผ่าน
 
 สถานะ: ตัวตรวจ Read-only รุ่นแก้ไขถูก Stage ใน Draft PR #4 เท่านั้น; ยังไม่ผ่านกับ Compose จริง, ยังไม่มี V3 Installer, ไม่มีการหยุด OpenBot, ไม่มีการยืนยัน Functional Test
+
+## Runtime Bubblewrap 26 Oct 2026 — owner-provided production evidence (not repaired)
+
+ผู้ดูแลส่งผลตรวจสดจาก UmbrelOS Host:
+- Read-only V3 planner: `RESULT=V3_COMPOSE_READ_ONLY_PLAN_PASS`, `ALLOWED_PATCHES=2_SECURITY_OPT_SCALARS_ONLY`, `HOST_FILES_CHANGED=NO` (ตรวจแล้วว่าตัวตรวจอ่าน Compose จริงได้; ไม่ใช่การ Apply).
+- `docker inspect`: OpenBot container `running`, AppArmor label `mochilab-openbot`, mount `/data:RW=true` เพียงจุดเดียวในผลที่แสดง.
+- `/proc/1/status`: `NoNewPrivs: 1`, `Seccomp: 2`, `Seccomp_filters: 1`. ค่านี้พิสูจน์ว่ามี filter แต่ไม่ได้รับรองเนื้อหา policy.
+- `bwrap --unshare-user --unshare-pid --ro-bind / / --proc /proc --dev /dev -- /bin/true` ภายใน container: `bwrap: Failed to make / slave: Operation not permitted`, `BWRAP_TEST_FAILED`. Command payload ไม่ได้เริ่มและ Workspace-only ยังไม่ได้รับการยืนยัน.
+
+หลักฐานจาก source ที่ตรวจ GitHub:
+- `mochilab-openbot/hooks/mochilab-openbot.apparmor` บน `main` มี `deny mount,` โดยตรง; profile label จาก Runtime ตรงชื่อ แต่ **ยังไม่ได้อ่าน/ยืนยัน byte identity ของ policy ที่ kernel โหลดอยู่**.
+- `nightly-labs/openbot` tag `v0.49.0` `docker/seccomp.json` มี default `SCMP_ACT_ERRNO`; กฎ `mount` ถูก `SCMP_ACT_ALLOW` ภายใต้ `includes.caps: [CAP_SYS_ADMIN]`. Compose ที่ repo ไม่มี `cap_add` และ runtime ยังไม่ได้ตรวจ effective capabilities แบบเต็ม; จึงต้องยืนยันอย่างระมัดระวังก่อนสรุปว่าชั้นใดให้ EPERM.
+- Draft PR #1 ได้บันทึกผล isolated native Codex Lab ก่อนหน้า (`NATIVE_CODEX_WORKSPACE_WRITE=PASS`, `NATIVE_CODEX_OUTSIDE_WRITE=BLOCKED` และ cleanup) ซึ่งเป็น **staging synthetic evidence ไม่ใช่ production proof**. อย่านำ V2 installer หรือ Compose template กลับมาใช้.
+
+การตัดสินใจ: ไม่ต้องทำซ้ำ production `bwrap` เพื่อพิสูจน์ความล้มเหลวเดิมอีก; ไปต่อด้วย security review ของ candidate AppArmor/Seccomp (อนุญาตเฉพาะสิ่งจำเป็น), ใช้หลักฐาน isolated Lab ที่ตรวจแล้วประกอบ, และพัฒนา V3 apply/rollback แบบรักษา Umbrel runtime Compose, hooks, metadata, backup และ recovery. ยังคง **DESIGN_ONLY / NOT_DEPLOYABLE / NO PRODUCTION MUTATION**; ไม่มีการ Merge, Recreate หรือเปลี่ยน Security Profile จากการบันทึกนี้.
