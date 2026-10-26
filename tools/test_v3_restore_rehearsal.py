@@ -49,7 +49,7 @@ class Rehearsal(unittest.TestCase):
         self.patchers = [
             mock.patch.object(tx, "APP", self.app),
             mock.patch.object(restore, "PARENT", self.parent),
-            mock.patch.object(restore.os, "geteuid", return_value=0),
+            mock.patch.object(restore, "require_root", return_value=True),
             mock.patch.object(tx, "external_backup_parent", return_value=123),
         ]
         for patcher in self.patchers:
