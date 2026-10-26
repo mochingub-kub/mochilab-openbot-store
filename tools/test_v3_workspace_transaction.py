@@ -153,6 +153,68 @@ class Transaction(unittest.TestCase):
             with self.assertRaises(tx.Blocked):
                 original(require_running=False)
 
+    @staticmethod
+    def make_umbreld_runtime(source):
+        import yaml
+        baseline = yaml.safe_load(source)
+        del baseline["services"]["app_proxy"]
+        return yaml.safe_dump(baseline, sort_keys=False)
+
+    def test_umbreld_generated_runtime_with_real_service_fields_passes(self):
+        from test_v3_compose_plan import BASE
+        # Generated file is a full Compose minus app_proxy, NOT an override.
+        generated = self.make_umbreld_runtime(BASE)
+        self.assertIn("security_opt:", generated)
+        self.assertIn("volumes:", generated)
+        tx.validate_umbreld_runtime_compose(BASE, generated)
+
+    def test_umbreld_generated_runtime_with_managed_long_volume_passes(self):
+        from test_v3_compose_plan import BASE, Cases
+        baseline = BASE.replace(
+            "    volumes:\n      - ${APP_DATA_DIR}/data:/data\n",
+            Cases.umbrel_long_volume(),
+        )
+        tx.validate_umbreld_runtime_compose(
+            baseline, self.make_umbreld_runtime(baseline)
+        )
+
+    def test_umbreld_security_override_drift_denied(self):
+        from test_v3_compose_plan import BASE
+        generated = self.make_umbreld_runtime(BASE).replace(
+            "apparmor=mochilab-openbot",
+            "apparmor=unconfined",
+        )
+        with self.assertRaises(tx.Blocked) as error:
+            tx.validate_umbreld_runtime_compose(BASE, generated)
+        self.assertIn("UMBRELD_RUNTIME_COMPOSE_SEMANTIC_DRIFT", str(error.exception))
+
+    def test_umbreld_extra_mount_drift_denied(self):
+        from test_v3_compose_plan import BASE
+        generated = self.make_umbreld_runtime(BASE).replace(
+            "    volumes:\n",
+            "    volumes:\n    - /etc:/host:rw\n",
+        )
+        with self.assertRaises(tx.Blocked):
+            tx.validate_umbreld_runtime_compose(BASE, generated)
+
+    def test_umbreld_unknown_service_drift_denied(self):
+        from test_v3_compose_plan import BASE
+        generated = self.make_umbreld_runtime(BASE) + "  attacker:\n    image: untrusted\n"
+        with self.assertRaises(tx.Blocked):
+            tx.validate_umbreld_runtime_compose(BASE, generated)
+
+    def test_umbreld_duplicate_yaml_key_denied(self):
+        from test_v3_compose_plan import BASE
+        generated = self.make_umbreld_runtime(BASE)
+        generated = generated.replace("services:\n", "services:\nservices:\n", 1)
+        with self.assertRaises(tx.Blocked):
+            tx.validate_umbreld_runtime_compose(BASE, generated)
+
+    def test_umbreld_retained_app_proxy_denied(self):
+        from test_v3_compose_plan import BASE
+        with self.assertRaises(tx.Blocked):
+            tx.validate_umbreld_runtime_compose(BASE, BASE)
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
