@@ -7,7 +7,9 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
+import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v3_workspace_transaction as tx
 import v3_restore_rehearsal as restore
 
