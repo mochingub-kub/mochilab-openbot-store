@@ -256,6 +256,11 @@ def prepare_backup(parent, manifest, *, transaction=None):
                       str(APP / "data") + "/", str(transaction / "data") + "/"])
     if difference:
         fail("DATA_BACKUP_CHECKSUM_MISMATCH")
+    # Baseline may be changed by the Umbrel updater between inspection and copy.
+    for rel in BACKUP_CONFIG:
+        expected = manifest["original_sha256"][rel]
+        if digest((APP / rel).read_bytes()) != expected or digest((transaction / "config" / rel).read_bytes()) != expected:
+            fail("CONFIG_CHANGED_DURING_BACKUP")
     manifest["state"] = "BACKED_UP"
     manifest_save(transaction, manifest)
     return transaction
@@ -354,7 +359,13 @@ def stage(parent):
             check_stopped()
             if digest(payload) != new_sha[rel]:
                 fail("STAGE_PAYLOAD_DRIFT")
-            atomic_publish(APP / rel, payload, new=new)
+            # Do not write over an updater/administrator edit detected mid-transaction.
+            target = APP / rel
+            if not new and digest(target.read_bytes()) != original[rel]:
+                fail("BASELINE_CHANGED_BEFORE_PUBLISH")
+            if new and (target.exists() or target.is_symlink()):
+                fail("NEW_ARTIFACT_CONFLICT_BEFORE_PUBLISH")
+            atomic_publish(target, payload, new=new)
         for rel in MODIFIED:
             if digest((APP / rel).read_bytes()) != new_sha[rel]:
                 fail("STAGE_READBACK_MISMATCH")
