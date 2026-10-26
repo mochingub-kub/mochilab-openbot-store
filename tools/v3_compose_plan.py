@@ -161,7 +161,7 @@ def compose_targets(yaml, source):
     return found
 
 
-def simulate(source):
+def plan_candidate(source):
     yaml = yaml_module()
     found = compose_targets(yaml, source)
     changes = []
@@ -220,7 +220,13 @@ def simulate(source):
         reverse = reverse[:a] + old + reverse[a + len(new):]
     if reverse != source:
         reject("NON_TARGET_BYTES_CHANGED")
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+    return hashlib.sha256(source.encode("utf-8")).hexdigest(), patched
+
+
+def simulate(source):
+    """Keep the original read-only planner API for callers and tests."""
+    digest, _candidate = plan_candidate(source)
+    return digest
 
 
 def main(argv=None):
