@@ -113,16 +113,19 @@ class BackupLifecycle(unittest.TestCase):
                          "synthetic-private-session")
 
 
-    def test_unsafe_049_compose_lists_missing_fields_without_secrets(self):
+    def test_compose_diagnostic_missing_security_never_prints_raw_values(self):
         compose = self.app / "docker-compose.yml"
         compose.write_text(
-            "SECRET_CANARY_NOT_FOR_LOGS\\n"
-            "    image: ghcr.io/nightly-labs/openbot:0.49.0\\n"
-            "    security_opt:\\n"
-            "      - apparmor=mochilab-openbot-workspace\\n"
-            "      - no-new-privileges:true\\n"
-            "    volumes:\\n"
-            "      - " + "$" + "{APP_DATA_DIR}/data:/data\\n"
+            "services:\n"
+            "  openbot:\n"
+            "    image: ghcr.io/nightly-labs/openbot:0.49.0\n"
+            "    environment:\n"
+            "      TEST_SECRET: SECRET_CANARY_NOT_FOR_LOGS\n"
+            "    security_opt:\n"
+            "      - apparmor=mochilab-openbot-workspace\n"
+            "      - no-new-privileges:true\n"
+            "    volumes:\n"
+            "      - " + "$" + "{APP_DATA_DIR}/data:/data\n"
         )
         with contextlib.redirect_stdout(io.StringIO()) as output:
             with self.assertRaises(bk.Blocked) as err:
@@ -136,12 +139,80 @@ class BackupLifecycle(unittest.TestCase):
         self.assertNotIn("SECRET_CANARY_NOT_FOR_LOGS", rendered)
         self.assertIn("EXPECTED_049_V3_COMPOSE_NOT_FOUND", str(err.exception))
 
-    def test_unmodified_diagnostic_gate_stops_before_creating_backup(self):
+    def test_invalid_yaml_blocks_before_creating_backup(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:
-            with self.assertRaises(bk.Blocked):
+            with self.assertRaises(bk.Blocked) as e:
                 self.real_check_app()
-        self.assertIn("CHECK_IMAGE_049=MISSING", output.getvalue())
+        self.assertIn("DATA_BIND_", str(e.exception))
         self.assertEqual(list(self.hdd.iterdir()), [])
+
+    def volume_compose(self, entry):
+        return "services:\n  openbot:\n    volumes:\n" + entry
+
+    def test_original_short_volume_accepted(self):
+        short = "$" + "{APP_DATA_DIR}/data:/data"
+        self.assertEqual(
+            bk.recognized_data_bind(self.volume_compose("      - " + short + "\n")),
+            "ORIGINAL_SHORT_APP_DATA_DIR")
+
+    def test_managed_short_volume_accepted(self):
+        short = "$" + "{APP_DATA_ROOT}:/data"
+        self.assertEqual(
+            bk.recognized_data_bind(self.volume_compose("      - " + short + "\n")),
+            "UMBREL_SHORT_APP_DATA_ROOT")
+
+    def managed_long(self, source=None, target="/data", readonly=False,
+                     create_host_path=False):
+        source = source if source is not None else "$" + "{APP_DATA_ROOT}"
+        return self.volume_compose(
+            "      - type: bind\n"
+            "        source: " + source + "\n"
+            "        target: " + target + "\n"
+            "        read_only: " + str(readonly).lower() + "\n"
+            "        bind:\n"
+            "          create_host_path: " + str(create_host_path).lower() + "\n"
+        )
+
+    def test_managed_long_volume_accepted(self):
+        self.assertEqual(
+            bk.recognized_data_bind(self.managed_long()),
+            "UMBREL_MANAGED_LONG_APP_DATA_ROOT")
+
+    def test_unexpected_source_rejected(self):
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(self.managed_long(source="/host/private"))
+
+    def test_unexpected_target_rejected(self):
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(self.managed_long(target="/root"))
+
+    def test_long_form_readonly_rejected(self):
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(self.managed_long(readonly=True))
+
+    def test_long_form_create_host_path_rejected(self):
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(self.managed_long(create_host_path=True))
+
+    def test_extra_volume_rejected(self):
+        unsafe = self.managed_long() + "      - /etc:/host:rw\n"
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(unsafe)
+
+    def test_duplicate_volume_field_rejected(self):
+        unsafe = self.managed_long().replace("        target: /data\n",
+                                             "        target: /data\n"
+                                             "        target: /etc\n")
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(unsafe)
+
+    def test_aliased_yaml_rejected(self):
+        unsafe = self.volume_compose(
+            "      - &a " + "$" + "{APP_DATA_DIR}/data:/data\n"
+            "      - *a\n"
+        )
+        with self.assertRaises(bk.Blocked):
+            bk.recognized_data_bind(unsafe)
 
 
 if __name__ == "__main__":
