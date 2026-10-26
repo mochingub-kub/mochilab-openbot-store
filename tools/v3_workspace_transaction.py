@@ -88,20 +88,45 @@ def check_installed():
     for rel in NEW_ONLY:
         if (APP / rel).exists() or (APP / rel).is_symlink():
             fail("V3_ARTIFACT_ALREADY_PRESENT_" + rel.replace("/", "_"))
-    override_text = (APP / "docker-compose.umbreld.yml").read_text(encoding="utf-8")
-    try:
-        import yaml
-        overlay = yaml.safe_load(override_text) or {}
-        target = (overlay.get("services") or {}).get("openbot") or {}
-        forbidden = {"security_opt", "volumes", "privileged", "cap_add",
-                     "cap_drop", "image", "pid", "devices", "userns_mode", "network_mode"}
-        if not isinstance(target, dict) or set(target) & forbidden:
-            fail("UMBREL_OVERRIDE_SECURITY_DRIFT")
-    except (ValueError, TypeError, AttributeError):
-        fail("UMBREL_OVERRIDE_INVALID")
     source = (APP / "docker-compose.yml").read_text(encoding="utf-8")
+    # The planner validates full source including managed data-root volumes.
     before, candidate = plan_candidate(source)
+    runtime = (APP / "docker-compose.umbreld.yml").read_text(encoding="utf-8")
+    validate_umbreld_runtime_compose(source, runtime)
+    # A third Compose file (umbrel-user-settings) and common Compose fragments
+    # are separate effective-configuration gates, never silently ignored.
+    if (APP / "docker-compose.umbrel-user-settings.yml").exists():
+        fail("USER_SETTINGS_COMPOSE_REQUIRES_EXPLICIT_REVIEW")
     return source, before, candidate
+
+
+def validate_umbreld_runtime_compose(source, runtime):
+    """Validate Umbrel-generated runtime Compose, not a partial override.
+
+    umbrelOS's app-script generates docker-compose.umbreld.yml from the
+    package Compose with: yq 'del(.services.app_proxy)' docker-compose.yml.
+    Fail closed on any other semantic difference. Do not print values.
+    """
+    import yaml
+    from v3_compose_plan import parse
+
+    # PyYAML safe_load alone silently accepts duplicate mapping keys.
+    # Parse nodes first to reject duplicate/aliased/merged/unknown tags.
+    parse(yaml, source)
+    parse(yaml, runtime)
+    original = yaml.safe_load(source)
+    generated = yaml.safe_load(runtime)
+    if not isinstance(original, dict) or not isinstance(generated, dict):
+        fail("UMBRELD_RUNTIME_STRUCTURE_INVALID")
+    services = original.get("services")
+    if not isinstance(services, dict) or "app_proxy" not in services:
+        fail("UMBRELD_SOURCE_PROXY_MISSING")
+    expected = dict(original)
+    expected_services = dict(services)
+    del expected_services["app_proxy"]
+    expected["services"] = expected_services
+    if generated != expected:
+        fail("UMBRELD_RUNTIME_COMPOSE_SEMANTIC_DRIFT")
 
 
 def check_artifacts():
