@@ -30,7 +30,8 @@ jobs:
       - name: Verify security-gated release package
         run: |
           python3 tools/openbot_release_plan.py --check-current
-          python3 -m unittest discover -s tools -p 'test_openbot_release_plan.py' -v
+          python3 -m compileall -q tools/openbot_release_plan.py tools/openbot_upgrade_backup.py
+          python3 -m unittest discover -s tools -p 'test_openbot*.py' -v
       - name: Verify hook shell syntax and required executable bit
         run: |
           bash -n mochilab-openbot/hooks/pre-start
