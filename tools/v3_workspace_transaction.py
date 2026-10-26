@@ -221,6 +221,9 @@ def external_backup_parent(parent):
     parts = mounted.split()
     if len(parts) != 2 or parts[0] == "/" or parts[1] not in ("ext4", "xfs", "btrfs"):
         fail("INDEPENDENT_MOUNT_NOT_VERIFIED")
+    mount_options = run(["findmnt", "-T", str(parent), "-no", "OPTIONS"]).split(",")
+    if "rw" not in mount_options:
+        fail("BACKUP_MOUNT_NOT_READ_WRITE")
     if parent.stat().st_dev == (APP / "data").stat().st_dev:
         fail("BACKUP_ON_SAME_FILESYSTEM")
     # A separate partition on the same NVMe is not an independent backup.
@@ -237,6 +240,27 @@ def external_backup_parent(parent):
     if free <= bytes_used * 1.35 + 1073741824:
         fail("BACKUP_INSUFFICIENT_SPACE")
     return bytes_used
+
+
+def backup_preflight(parent):
+    """Read-only confirmation before the operator schedules any downtime."""
+    check_installed()
+    check_artifacts()
+    check_live_baseline()
+    required = ("rsync", "findmnt", "lsblk", "du", "git", "docker", "apparmor_parser")
+    missing = [name for name in required if shutil.which(name) is None]
+    if missing:
+        fail("BACKUP_TOOL_MISSING_" + "_".join(missing).upper())
+    size = external_backup_parent(parent)
+    if run(["findmnt", "-T", str(parent), "-no", "TARGET"]) != str(parent):
+        fail("BACKUP_PARENT_MUST_BE_MOUNT_ROOT")
+    print("RESULT=V3_BACKUP_PREFLIGHT_PASS_NO_WRITES")
+    print("SOURCE_DATA_BYTES=" + str(size))
+    print("INDEPENDENT_PHYSICAL_BACKUP_DEVICE=PASS")
+    print("BACKUP_DISK_READ_WRITE=YES")
+    print("APP_REMAINS_RUNNING=YES")
+    print("BACKUP_COPY_CREATED=NO")
+    print("RESTORE_TEST=NOT_RUN")
 
 
 def secure_dir(path):
@@ -470,6 +494,7 @@ def main():
     parser = argparse.ArgumentParser(description="Mochilab OpenBot V3 gated config transaction")
     p = parser.add_mutually_exclusive_group(required=True)
     p.add_argument("--check", action="store_true")
+    p.add_argument("--backup-preflight", metavar="MOUNTED_BACKUP_ROOT", type=Path)
     p.add_argument("--stage", metavar="INDEPENDENT_BACKUP_PARENT", type=Path)
     p.add_argument("--rollback", metavar="TRANSACTION_DIR", type=Path)
     p.add_argument("--verify", action="store_true")
@@ -484,6 +509,8 @@ def main():
             print("PRODUCTION_DEPLOYED=NO")
             print("EFFECTIVE_OVERRIDES=PARTIALLY_INSPECTED")
             print("BACKUP_RESTORE_TEST=NOT_RUN")
+        elif a.backup_preflight:
+            backup_preflight(a.backup_preflight)
         elif a.stage:
             stage(a.stage)
         elif a.rollback:
