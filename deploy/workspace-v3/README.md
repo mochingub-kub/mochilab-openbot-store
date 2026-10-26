@@ -55,6 +55,22 @@ Portainer Docker-in-Docker terminal, Mac or OpenBot Agent.
       limitation. A separate effective Compose validation is needed before
       a production apply, using the actual files/environment.
 
+**Read-only effective RUNNING Docker baseline checkpoint:** Before any stopped-only
+`--stage` authorization, run the exact reviewed Draft commit's
+`sudo python3 tools/v3_effective_runtime_check.py` on the UmbrelOS Host while
+OpenBot is still running. It reuses V3's pinned Compose, AppArmor/Seccomp
+artifact and running container baseline checks, then inspects the *actual*
+Docker Compose project objects. For the owner-verified 0.49.0-3 package,
+it requires exactly `landing` and `openbot`, their expected images,
+volume sources, strict landing-user/read-only/cap-drop/tmpfs settings,
+`umbrel_main_network`, and no extra host bind mounts, published host ports,
+privileged mode, added caps, devices or host PID/IPC/network namespace.
+It prints short PASS/BLOCKED markers only; never emits Docker `Config.Env`,
+credentials, tokens or container log content. This is a **baseline of the
+currently running deployment**, not a live simulation of V3 after restart.
+If a legitimate additional service like tor_server is in use, review it
+separately; do not bypass this gate or disable network checks.
+
 2. **Independent backup**:
    a. Inspect the target disk's mount/source/filesystem/ownership and free
       space. Choose its exact HOST absolute path; never infer host path from
