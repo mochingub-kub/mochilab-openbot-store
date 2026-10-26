@@ -37,6 +37,7 @@ class Transaction(unittest.TestCase):
         self.actual_check_stopped = tx.check_stopped
         self.actual_external_backup_parent = tx.external_backup_parent
         self.patchers = [
+            mock.patch.object(tx, "owned_root", return_value=True),
             mock.patch.object(tx, "check_stopped", side_effect=lambda: True),
             mock.patch.object(tx, "check_live_baseline", side_effect=lambda **_: True),
             mock.patch.object(tx, "check_installed",
