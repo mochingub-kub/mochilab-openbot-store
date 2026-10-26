@@ -82,6 +82,25 @@ Portainer Docker-in-Docker terminal, Mac or OpenBot Agent.
       rehearsal. Backup copy integrity is not app restore success.
    e. If a condition or permission is unknown, abort instead of guessing.
 
+**New safety checkpoint — BACKUP-ONLY before modifying policy:** After a
+successfully verified `--backup-preflight` (while the app is running), obtain
+owner permission for a maintenance window, stop OpenBot through the Umbrel
+app UI, and use the reviewed `tools/v3_backup_only.py --backup-only
+EXTERNAL_HDD_MOUNT` on the UmbrelOS Host. It requires an explicit typed
+`BACKUP-V3` confirmation, all containers removed, and rechecks the original
+on-disk Compose/Policy and independent writable disk. It then saves all
+configuration plus /data to an independent private (0700) HDD directory,
+checks exact configuration bytes and rsync checksum results, and reports
+`RESULT=V3_BACKUP_ONLY_VERIFIED_COPY`. It does **not** stage or change policy.
+The backup contains private OpenBot session material and is **not known to be
+encrypted at rest**. Do not expose this folder through public Files or shares.
+An interrupted copy has state `UNTRUSTED_INCOMPLETE` and is not usable as a
+checkpoint. After backup success, perform an actual file-level restoration
+rehearsal in an isolated directory before any security rollout. The full
+OpenBot application restore remains unverified unless separately tested.
+The later `--stage` currently makes a **second** independent safety copy;
+it does not reuse the backup-only transaction.
+
 3. **Stage/rollback**:
    a. Only the two existing Compose 'security_opt' scalar tokens are
       changed. No template replacement or YAML reserialization.
