@@ -17,6 +17,7 @@ class BackupLifecycle(unittest.TestCase):
         t = tempfile.TemporaryDirectory()
         self.addCleanup(t.cleanup)
         self.root = Path(t.name)
+        self.real_check_app = bk.check_app
         self.app = self.root / "app"
         self.hdd = self.root / "hdd"
         self.app.mkdir()
@@ -110,6 +111,37 @@ class BackupLifecycle(unittest.TestCase):
         self.assertFalse((snap / "manifest.json").exists())
         self.assertEqual((self.app / "data" / "fixture.txt").read_text(),
                          "synthetic-private-session")
+
+
+    def test_unsafe_049_compose_lists_missing_fields_without_secrets(self):
+        compose = self.app / "docker-compose.yml"
+        compose.write_text(
+            "SECRET_CANARY_NOT_FOR_LOGS\\n"
+            "    image: ghcr.io/nightly-labs/openbot:0.49.0\\n"
+            "    security_opt:\\n"
+            "      - apparmor=mochilab-openbot-workspace\\n"
+            "      - no-new-privileges:true\\n"
+            "    volumes:\\n"
+            "      - " + "$" + "{APP_DATA_DIR}/data:/data\\n"
+        )
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            with self.assertRaises(bk.Blocked) as err:
+                self.real_check_app()
+        rendered = output.getvalue()
+        self.assertIn("CHECK_SECCOMP_V3=MISSING", rendered)
+        self.assertIn("CHECK_IMAGE_049=PASS", rendered)
+        self.assertIn("CHECK_APPARMOR_V3=PASS", rendered)
+        self.assertIn("CHECK_DATA_BIND=PASS", rendered)
+        self.assertIn("CHECK_NO_NEW_PRIVILEGES=PASS", rendered)
+        self.assertNotIn("SECRET_CANARY_NOT_FOR_LOGS", rendered)
+        self.assertIn("EXPECTED_049_V3_COMPOSE_NOT_FOUND", str(err.exception))
+
+    def test_unmodified_diagnostic_gate_stops_before_creating_backup(self):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            with self.assertRaises(bk.Blocked):
+                self.real_check_app()
+        self.assertIn("CHECK_IMAGE_049=MISSING", output.getvalue())
+        self.assertEqual(list(self.hdd.iterdir()), [])
 
 
 if __name__ == "__main__":
