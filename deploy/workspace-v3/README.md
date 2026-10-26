@@ -85,7 +85,9 @@ Portainer Docker-in-Docker terminal, Mac or OpenBot Agent.
       transaction: DO NOT START until recovery is reviewed.
    d. 'sudo python3 ... --rollback TRANSACTION_DIR' is stopped-only and
       refuses any unexpected third-party edits. It restores only changed
-      configuration; the complete data backup remains untouched.
+      configuration; the complete data backup remains untouched. An AppArmor
+      profile already loaded in the host kernel may remain loaded but unused
+      after config rollback; never unload a profile that a running process uses.
 
 4. **Start and verify after separate explicit production authorization**:
    a. Start via Umbrel lifecycle. This runs the reviewed, hash-pinned
