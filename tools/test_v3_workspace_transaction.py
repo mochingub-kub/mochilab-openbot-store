@@ -215,6 +215,29 @@ class Transaction(unittest.TestCase):
         with self.assertRaises(tx.Blocked):
             tx.validate_umbreld_runtime_compose(BASE, BASE)
 
+    def test_umbrel_stop_removed_all_app_containers_is_valid(self):
+        # Real Umbrel app-script: docker compose rm --force --stop
+        with mock.patch.object(tx, "run", side_effect=["", ""]) as docker_read:
+            self.assertTrue(tx.check_stopped())
+        self.assertEqual(docker_read.call_count, 2)
+        self.assertEqual(docker_read.call_args_list[0].args[0][:3],
+                         ["docker", "ps", "-aq"])
+        self.assertEqual(docker_read.call_args_list[1].args[0][:3],
+                         ["docker", "inspect", "--format"])
+
+    def test_umbrel_stop_blocks_lingering_project_containers(self):
+        with mock.patch.object(tx, "run", return_value="docker-id-abc") as docker_read:
+            with self.assertRaises(tx.Blocked) as error:
+                tx.check_stopped()
+        self.assertIn("APP_CONTAINERS_STILL_PRESENT", str(error.exception))
+        self.assertEqual(docker_read.call_count, 1)
+
+    def test_umbrel_stop_blocks_unlabeled_container_with_same_name(self):
+        with mock.patch.object(tx, "run", side_effect=["", "docker-id-xyz"]):
+            with self.assertRaises(tx.Blocked) as error:
+                tx.check_stopped()
+        self.assertIn("OPENBOT_NAMED_CONTAINER_STILL_PRESENT", str(error.exception))
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
