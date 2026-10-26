@@ -10,6 +10,7 @@ from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import v3_workspace_transaction as tx
+import v3_backup_only as backup_only
 
 
 class Transaction(unittest.TestCase):
@@ -286,6 +287,56 @@ class Transaction(unittest.TestCase):
             with self.assertRaises(tx.Blocked) as error:
                 self.actual_external_backup_parent(self.parent)
         self.assertIn("BACKUP_MOUNT_NOT_READ_WRITE", str(error.exception))
+
+    def test_backup_only_checkpoint_creates_verified_copy_without_app_mutation(self):
+        before = {rel: (self.app / rel).read_bytes() for rel in tx.BACKUP_CONFIG}
+        canary = (self.app / "data" / "canary.txt").read_bytes()
+        original_run = tx.run
+
+        def mount_or_run(args, **kwargs):
+            if args[:2] == ["findmnt", "-T"] and args[-1] == "TARGET":
+                return str(self.parent)
+            return original_run(args, **kwargs)
+
+        with mock.patch.object(tx, "run", side_effect=mount_or_run), \
+             mock.patch("builtins.input", return_value="BACKUP-V3"), \
+             contextlib.redirect_stdout(io.StringIO()) as out:
+            backup_only.backup_only(self.parent)
+        self.assertIn("RESULT=V3_BACKUP_ONLY_VERIFIED_COPY", out.getvalue())
+        self.assertIn("SECURITY_POLICY_CHANGED=NO", out.getvalue())
+        backups = list(self.parent.glob(".mochilab-openbot-v3-backup-only-*"))
+        self.assertEqual(len(backups), 1)
+        m = json.loads((backups[0] / "manifest.json").read_text())
+        self.assertEqual(m["state"], "BACKED_UP")
+        self.assertEqual(m["schema"], backup_only.SCHEMA)
+        self.assertEqual((backups[0] / "data" / "canary.txt").read_bytes(), canary)
+        self.assertEqual((backups[0] / "config" / "hooks" / "pre-start").read_bytes(), before["hooks/pre-start"])
+        self.assertEqual((backups[0].stat().st_mode & 0o777), 0o700)
+        for rel, data in before.items():
+            self.assertEqual((self.app / rel).read_bytes(), data)
+        self.assertFalse((self.app / tx.NEW_ONLY[0]).exists())
+        self.assertFalse((self.app / tx.NEW_ONLY[1]).exists())
+
+    def test_backup_only_requires_operator_confirmation(self):
+        with mock.patch.object(tx, "run", return_value=str(self.parent)), \
+             mock.patch("builtins.input", return_value=""):
+            with self.assertRaises(tx.Blocked) as err:
+                backup_only.backup_only(self.parent)
+        self.assertIn("BACKUP_OPERATOR_CONFIRMATION_MISSING", str(err.exception))
+        self.assertFalse(list(self.parent.glob(".mochilab-openbot-v3-backup-only-*")))
+
+    def test_backup_only_incomplete_copy_not_reported_verified(self):
+        with mock.patch.object(tx, "run", return_value=str(self.parent)), \
+             mock.patch("builtins.input", return_value="BACKUP-V3"), \
+             mock.patch.object(tx, "prepare_backup", side_effect=OSError("synthetic copy failure")), \
+             contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(OSError):
+                backup_only.backup_only(self.parent)
+        backups = list(self.parent.glob(".mochilab-openbot-v3-backup-only-*"))
+        self.assertEqual(len(backups), 1)
+        m = json.loads((backups[0] / "manifest.json").read_text())
+        self.assertEqual(m["state"], "UNTRUSTED_INCOMPLETE")
+        self.assertEqual((self.app / "data" / "canary.txt").read_text(), "private test fixture")
 
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
