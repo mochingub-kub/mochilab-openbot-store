@@ -23,28 +23,29 @@ class SafeUpdater(unittest.TestCase):
             dest = self.root / relative
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(up.ROOT / relative, dest)
+        self.initial_version = up.current(self.root)
 
-    def test_packaged_050_version_and_security_integrity(self):
-        self.assertEqual(up.current(self.root), "0.50.0")
+    def test_packaged_version_and_security_integrity(self):
+        self.assertEqual(up.current(self.root), self.initial_version)
 
     def test_build_next_version_edits_only_image_manifest_and_note(self):
         before = (self.root / up.IMAGE_FILE).read_text()
         hook = (self.root / "mochilab-openbot/hooks/pre-start").read_bytes()
-        self.assertTrue(up.propose(self.root, "0.51.2"))
-        self.assertEqual(up.current(self.root), "0.51.2")
+        self.assertTrue(up.propose(self.root, "999.999.999"))
+        self.assertEqual(up.current(self.root), "999.999.999")
         after = (self.root / up.IMAGE_FILE).read_text()
-        self.assertEqual(after.replace("openbot:0.51.2", "openbot:0.50.0"), before)
+        self.assertEqual(after.replace("openbot:999.999.999", "openbot:" + self.initial_version), before)
         m = (self.root / up.MANIFEST_FILE).read_text()
-        self.assertIn('version: "0.51.2-1"', m)
-        self.assertIn("engine to 0.51.2", m)
+        self.assertIn('version: "999.999.999-1"', m)
+        self.assertIn("engine to 999.999.999", m)
         self.assertEqual(hook, (self.root / "mochilab-openbot/hooks/pre-start").read_bytes())
         self.assertEqual(list(self.root.rglob("*.apparmor"))[0].read_bytes(),
                          (up.ROOT / "mochilab-openbot/hooks/mochilab-openbot-workspace.apparmor").read_bytes())
 
     def test_same_or_older_release_does_not_downgrade(self):
         compose = (self.root / up.IMAGE_FILE).read_bytes()
-        self.assertFalse(up.propose(self.root, "0.50.0"))
-        self.assertFalse(up.propose(self.root, "0.49.9"))
+        self.assertFalse(up.propose(self.root, self.initial_version))
+        self.assertFalse(up.propose(self.root, "0.0.0"))
         self.assertEqual((self.root / up.IMAGE_FILE).read_bytes(), compose)
 
     def test_bad_version_rejected_without_modifications(self):
@@ -55,7 +56,7 @@ class SafeUpdater(unittest.TestCase):
 
     def test_app_manifest_mismatch_rejected(self):
         manifest = self.root / up.MANIFEST_FILE
-        manifest.write_text(manifest.read_text().replace("0.50.0-1", "0.49.0-3"))
+        manifest.write_text(manifest.read_text().replace("version: \"" + self.initial_version + "-1\"", "version: \"0.0.0-1\""))
         with self.assertRaises(up.Blocked) as err:
             up.current(self.root)
         self.assertIn("PACKAGE_IMAGE_VERSION_DRIFT", str(err.exception))
