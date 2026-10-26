@@ -101,6 +101,25 @@ OpenBot application restore remains unverified unless separately tested.
 The later `--stage` currently makes a **second** independent safety copy;
 it does not reuse the backup-only transaction.
 
+**Isolated FILE-level Restore Rehearsal (no downtime):** After the
+`BACKUP_ONLY_VERIFIED_COPY` result, reopen the original OpenBot using Umbrel's
+normal lifecycle and confirm `ready`. Use the pinned
+`tools/v3_restore_rehearsal.py --rehearse BACKUP_TRANSACTION` **on UmbrelOS
+Host**, referring to the exact `BACKUP_TRANSACTION` printed by backup-only.
+The helper requires a verified 0700 root-owned backup directory and a
+checksum-valid 0600 manifest; it rejects unexpected backup paths, a
+non-`BACKED_UP` manifest and tampered config files. It copies all backed-up
+`config/` and `data/` into a newly-created root-private temporary folder on
+the same independent external HDD, compares bytes/metadata with rsync
+checksums, and cleans up **only that temporary scratch copy**. It never
+modifies the backup, mounted original /data, production Compose or kernel
+AppArmor/Seccomp. It runs while the production app is online. Result
+`V3_FILE_RESTORE_REHEARSAL_PASS` establishes that the saved files can be
+reconstructed and compared, **NOT** a full production application restore
+or a Codex Workspace functional test. Disk must have enough spare space for
+a second temporary data copy; no cleanup or format of other HDD folders.
+If the helper fails, **do not stage V3** and preserve the original backup.
+
 3. **Stage/rollback**:
    a. Only the two existing Compose 'security_opt' scalar tokens are
       changed. No template replacement or YAML reserialization.
