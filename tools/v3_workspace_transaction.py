@@ -267,7 +267,7 @@ def safe_transaction(path):
     if not path.name.startswith(".mochilab-openbot-v3-"):
         fail("TRANSACTION_ID_INVALID")
     st = path.stat()
-    if st.st_uid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
+    if st.st_uid != os.geteuid() or stat.S_IMODE(st.st_mode) != 0o700:
         fail("TRANSACTION_OWNERSHIP_OR_PERMISSIONS_UNSAFE")
     regular(path / "manifest.json")
     m = json.loads((path / "manifest.json").read_text())
