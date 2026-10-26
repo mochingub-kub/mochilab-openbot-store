@@ -33,6 +33,7 @@ class Transaction(unittest.TestCase):
         self.app_patch.start()
         self.addCleanup(self.app_patch.stop)
         self.actual_check_live_baseline = tx.check_live_baseline
+        self.actual_check_stopped = tx.check_stopped
         self.patchers = [
             mock.patch.object(tx, "check_stopped", side_effect=lambda: True),
             mock.patch.object(tx, "check_live_baseline", side_effect=lambda **_: True),
@@ -218,7 +219,7 @@ class Transaction(unittest.TestCase):
     def test_umbrel_stop_removed_all_app_containers_is_valid(self):
         # Real Umbrel app-script: docker compose rm --force --stop
         with mock.patch.object(tx, "run", side_effect=["", ""]) as docker_read:
-            self.assertTrue(tx.check_stopped())
+            self.assertTrue(self.actual_check_stopped())
         self.assertEqual(docker_read.call_count, 2)
         self.assertEqual(docker_read.call_args_list[0].args[0][:3],
                          ["docker", "ps", "-aq"])
@@ -228,14 +229,14 @@ class Transaction(unittest.TestCase):
     def test_umbrel_stop_blocks_lingering_project_containers(self):
         with mock.patch.object(tx, "run", return_value="docker-id-abc") as docker_read:
             with self.assertRaises(tx.Blocked) as error:
-                tx.check_stopped()
+                self.actual_check_stopped()
         self.assertIn("APP_CONTAINERS_STILL_PRESENT", str(error.exception))
         self.assertEqual(docker_read.call_count, 1)
 
     def test_umbrel_stop_blocks_unlabeled_container_with_same_name(self):
         with mock.patch.object(tx, "run", side_effect=["", "docker-id-xyz"]):
             with self.assertRaises(tx.Blocked) as error:
-                tx.check_stopped()
+                self.actual_check_stopped()
         self.assertIn("OPENBOT_NAMED_CONTAINER_STILL_PRESENT", str(error.exception))
 
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
