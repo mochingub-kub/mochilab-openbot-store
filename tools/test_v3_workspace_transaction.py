@@ -254,6 +254,38 @@ class Transaction(unittest.TestCase):
             tx.require_fresh_workspace_profile(path)
         self.assertIn("APPARMOR_KERNEL_PROFILE_LIST_UNAVAILABLE", str(exc.exception))
 
+    def test_backup_preflight_does_not_modify_app_or_hdd(self):
+        before = (self.app / "docker-compose.yml").read_bytes()
+        original_data = (self.app / "data" / "canary.txt").read_bytes()
+        with mock.patch.object(tx, "check_live_baseline", return_value=True), \
+             mock.patch.object(tx, "run", return_value=str(self.parent)), \
+             mock.patch.object(tx.shutil, "which", return_value="/usr/bin/verified"):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                tx.backup_preflight(self.parent)
+        self.assertIn("V3_BACKUP_PREFLIGHT_PASS_NO_WRITES", out.getvalue())
+        self.assertIn("BACKUP_COPY_CREATED=NO", out.getvalue())
+        self.assertEqual((self.app / "docker-compose.yml").read_bytes(), before)
+        self.assertEqual((self.app / "data" / "canary.txt").read_bytes(), original_data)
+        self.assertFalse(list(self.parent.glob(".mochilab-openbot-v3-*")))
+
+    def test_backup_preflight_refuses_missing_rsync(self):
+        def which(name):
+            return None if name == "rsync" else "/usr/bin/verified"
+        with mock.patch.object(tx.shutil, "which", side_effect=which), \
+             mock.patch.object(tx, "check_live_baseline", return_value=True):
+            with self.assertRaises(tx.Blocked) as error:
+                tx.backup_preflight(self.parent)
+        self.assertIn("BACKUP_TOOL_MISSING_RSYNC", str(error.exception))
+        self.assertFalse(list(self.parent.glob(".mochilab-openbot-v3-*")))
+
+    def test_external_backup_mount_readonly_rejected(self):
+        with mock.patch.object(tx, "run", side_effect=[
+            str(self.parent) + " ext4", "ro,nosuid,nodev"
+        ]):
+            with self.assertRaises(tx.Blocked) as error:
+                tx.external_backup_parent(self.parent)
+        self.assertIn("BACKUP_MOUNT_NOT_READ_WRITE", str(error.exception))
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
