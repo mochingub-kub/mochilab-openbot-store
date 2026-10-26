@@ -239,6 +239,21 @@ class Transaction(unittest.TestCase):
                 self.actual_check_stopped()
         self.assertIn("OPENBOT_NAMED_CONTAINER_STILL_PRESENT", str(error.exception))
 
+    def test_app_armor_workspace_label_requires_distinct_unused_name(self):
+        profiles = pathlib.Path(self.tmp.name) / "profiles.txt"
+        profiles.write_text("mochilab-openbot (enforce)\n")
+        tx.require_fresh_workspace_profile(profiles)
+        profiles.write_text("mochilab-openbot-workspace (enforce)\n")
+        with self.assertRaises(tx.Blocked) as exc:
+            tx.require_fresh_workspace_profile(profiles)
+        self.assertIn("WORKSPACE_PROFILE_ALREADY_LOADED", str(exc.exception))
+
+    def test_missing_kernel_profile_list_blocks_preflight(self):
+        path = pathlib.Path(self.tmp.name) / "absent"
+        with self.assertRaises(tx.Blocked) as exc:
+            tx.require_fresh_workspace_profile(path)
+        self.assertIn("APPARMOR_KERNEL_PROFILE_LIST_UNAVAILABLE", str(exc.exception))
+
     def test_atomic_replacement_keeps_metadata_and_unrelated_bytes(self):
         target = self.app / "hooks/pre-start"
         before = target.stat()
