@@ -50,8 +50,8 @@ fi
 # V3 reviewed workspace sandbox: only load the distinct OpenBot workspace profile.
 # Keep the original upstream seccomp and original AppArmor profile untouched.
 # This profile is expanded relative to production. Never use without approval.
-WORKSPACE_APPARMOR="\${APP_DIR}/hooks/mochilab-openbot-workspace.apparmor"
-WORKSPACE_SECCOMP="\${APP_DIR}/seccomp-workspace.json"
+WORKSPACE_APPARMOR="${APP_DIR}/hooks/mochilab-openbot-workspace.apparmor"
+WORKSPACE_SECCOMP="${APP_DIR}/seccomp-workspace.json"
 WORKSPACE_AA_GIT_SHA="afd0d87e7a09e39afad12864fb988586ce95104e"
 WORKSPACE_SC_GIT_SHA="4fa610c6303f4610844dc6ae0da5546030a77cbb"
 [[ -f "$WORKSPACE_APPARMOR" && ! -L "$WORKSPACE_APPARMOR" ]] || {
