@@ -74,6 +74,98 @@ def require_root():
         block("REQUIRES_ROOT_ON_UMBREL_HOST")
 
 
+def recognized_data_bind(compose):
+    """Accept ONLY V3-reviewed Umbrel data mounts, never arbitrary bind sources.
+
+    The Umbrel app-data patcher converts an app-owned short-form mount into
+    APP_DATA_ROOT, often with a strict long-form read_only/bind mapping.
+    The previous substring check wrongly refused this normal managed mount.
+    Use strict YAML nodes to reject aliases, duplicate keys and extra volumes.
+    No raw Compose contents, environment values or host paths are logged.
+    """
+    try:
+        import yaml
+    except ImportError:
+        block("PYYAML_PARSER_MISSING")
+
+    def reject(reason):
+        block("DATA_BIND_" + reason)
+
+    def walk(node):
+        allowed = {"tag:yaml.org,2002:" + key for key in
+                   ("map", "seq", "str", "int", "bool", "null", "float")}
+        if node.tag not in allowed:
+            reject("UNSAFE_YAML_TAG")
+        if isinstance(node, yaml.MappingNode):
+            names = set()
+            for key, value in node.value:
+                if not isinstance(key, yaml.ScalarNode) or \
+                   key.tag != "tag:yaml.org,2002:str" or key.value in names:
+                    reject("DUPLICATE_OR_NONSTRING_KEY")
+                names.add(key.value)
+                walk(value)
+        elif isinstance(node, yaml.SequenceNode):
+            for value in node.value:
+                walk(value)
+
+    def mapping(node, label):
+        if not isinstance(node, yaml.MappingNode):
+            reject("NOT_MAPPING_" + label)
+        return {key.value: value for key, value in node.value}
+
+    def string(node, label):
+        if not isinstance(node, yaml.ScalarNode) or \
+           node.tag != "tag:yaml.org,2002:str":
+            reject("NOT_STRING_" + label)
+        return node.value
+
+    def bool_false(node, label):
+        if not isinstance(node, yaml.ScalarNode) or \
+           node.tag != "tag:yaml.org,2002:bool" or node.value.lower() != "false":
+            reject("NOT_FALSE_" + label)
+
+    try:
+        events = list(yaml.parse(compose, Loader=yaml.SafeLoader))
+        if any(isinstance(evt, yaml.AliasEvent) or
+               getattr(evt, "anchor", None) is not None for evt in events):
+            reject("ALIAS_OR_ANCHOR")
+        docs = list(yaml.compose_all(compose, Loader=yaml.SafeLoader))
+    except yaml.YAMLError:
+        reject("YAML_PARSE_FAILED")
+    if len(docs) != 1 or docs[0] is None:
+        reject("NOT_ONE_DOCUMENT")
+    walk(docs[0])
+    root = mapping(docs[0], "ROOT")
+    services = mapping(root.get("services"), "SERVICES")
+    openbot = mapping(services.get("openbot"), "OPENBOT")
+    vols = openbot.get("volumes")
+    if not isinstance(vols, yaml.SequenceNode) or len(vols.value) != 1:
+        reject("VOLUME_COUNT_OR_TYPE_DRIFT")
+    vol = vols.value[0]
+    d = "$" + "{APP_DATA_DIR}"
+    managed = "$" + "{APP_DATA_ROOT}"
+    if isinstance(vol, yaml.ScalarNode):
+        val = string(vol, "SHORT_FORM")
+        if val == d + "/data:/data":
+            return "ORIGINAL_SHORT_APP_DATA_DIR"
+        if val == managed + ":/data":
+            return "UMBREL_SHORT_APP_DATA_ROOT"
+        reject("SHORT_SOURCE_OR_TARGET_DRIFT")
+    fields = mapping(vol, "MANAGED_VOLUME")
+    if set(fields) != {"type", "source", "target", "read_only", "bind"}:
+        reject("LONGFORM_EXTRA_OR_MISSING_FIELDS")
+    if string(fields["type"], "TYPE") != "bind" or \
+       string(fields["source"], "SOURCE") != managed or \
+       string(fields["target"], "TARGET") != "/data":
+        reject("LONGFORM_SOURCE_OR_TARGET_DRIFT")
+    bool_false(fields["read_only"], "READ_ONLY")
+    bind = mapping(fields["bind"], "BIND")
+    if set(bind) != {"create_host_path"}:
+        reject("LONGFORM_BIND_FLAGS_DRIFT")
+    bool_false(bind["create_host_path"], "CREATE_HOST_PATH")
+    return "UMBREL_MANAGED_LONG_APP_DATA_ROOT"
+
+
 def check_app():
     require_root()
     if APP.is_symlink() or not APP.is_dir() or APP.resolve(strict=True) != APP:
@@ -90,9 +182,10 @@ def check_app():
         "IMAGE_049": "image: ghcr.io/nightly-labs/openbot:0.49.0" in compose,
         "APPARMOR_V3": "apparmor=mochilab-openbot-workspace" in compose,
         "SECCOMP_V3": "seccomp=" + d + "/seccomp-workspace.json" in compose,
-        "DATA_BIND": d + "/data:/data" in compose,
+        "DATA_BIND": True,  # strict semantic volume gate below
         "NO_NEW_PRIVILEGES": "no-new-privileges:true" in compose,
     }
+    volume_style = recognized_data_bind(compose)
     if not all(checks.values()):
         # Report labels only. Do NOT print Compose/environment/security contents.
         for name, ok in checks.items():
@@ -115,6 +208,7 @@ def check_app():
     ):
         if git_blob(APP / rel) != expected:
             block("SECURITY_POLICY_HASH_DRIFT")
+    print("VERIFIED_DATA_BIND_LAYOUT=" + volume_style)
     return {rel: sha256(APP / rel) for rel in CONFIG}
 
 
