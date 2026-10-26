@@ -9,11 +9,13 @@ on:
       - 'mochilab-openbot/**'
       - 'tools/**'
       - '.github/workflows/openbot-package-guard.yml'
+      - '.github/workflows/openbot-release-review.yml'
   pull_request:
     paths:
       - 'mochilab-openbot/**'
       - 'tools/**'
       - '.github/workflows/openbot-package-guard.yml'
+      - '.github/workflows/openbot-release-review.yml'
   workflow_dispatch:
 
 permissions:
