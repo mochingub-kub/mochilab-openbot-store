@@ -1,0 +1,74 @@
+name: OpenBot V3 package / updater safety checks
+
+on:
+  push:
+    branches:
+      - main
+      - design/openbot-0.50.0-safe-updater
+    paths:
+      - 'mochilab-openbot/**'
+      - 'tools/**'
+      - '.github/workflows/openbot-package-guard.yml'
+  pull_request:
+    paths:
+      - 'mochilab-openbot/**'
+      - 'tools/**'
+      - '.github/workflows/openbot-package-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify security-gated release package
+        run: |
+          python3 tools/openbot_release_plan.py --check-current
+          python3 -m unittest discover -s tools -p 'test_openbot_release_plan.py' -v
+      - name: Verify hook shell syntax and required executable bit
+        run: |
+          bash -n mochilab-openbot/hooks/pre-start
+          test -x mochilab-openbot/hooks/pre-start
+          test ! -L mochilab-openbot/hooks/pre-start
+      - name: Validate package YAML and Docker Compose semantics
+        run: |
+          python3 -m pip -q install 'PyYAML==6.0.2'
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          compose = yaml.safe_load(Path("mochilab-openbot/docker-compose.yml").read_text())
+          manifest = yaml.safe_load(Path("mochilab-openbot/umbrel-app.yml").read_text())
+          assert manifest["id"] == "mochilab-openbot"
+          assert manifest["storage"]["dataRoot"] == "data"
+          services = compose["services"]
+          assert set(services) == {"app_proxy", "landing", "openbot"}
+          engine = services["openbot"]
+          assert engine["image"].startswith("ghcr.io/nightly-labs/openbot:")
+          d = "$" + "{APP_DATA_DIR}"
+          assert engine["volumes"] == [d + "/data:/data"]
+          assert engine["security_opt"] == [
+              "seccomp=" + d + "/seccomp-workspace.json",
+              "apparmor=mochilab-openbot-workspace",
+              "no-new-privileges:true",
+          ]
+          assert "privileged" not in engine and "cap_add" not in engine
+          assert "ports" not in engine and "devices" not in engine
+          assert "network_mode" not in engine and "pid" not in engine
+          assert engine["mem_limit"] == "6g"
+          assert str(engine["cpus"]) == "4.0"
+          landing = services["landing"]
+          assert landing["read_only"] is True
+          assert landing["user"] == "101:101"
+          assert landing["cap_drop"] == ["ALL"]
+          assert landing["security_opt"] == ["no-new-privileges:true"]
+          assert landing["volumes"] == [d + "/landing:/usr/share/nginx/html:ro"]
+          print("RESULT=UPDATER_COMPOSE_SEMANTICS_PASS")
+          PY
+      - name: No checkout modifications
+        run: git diff --exit-code
