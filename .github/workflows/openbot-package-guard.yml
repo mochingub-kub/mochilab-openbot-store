@@ -70,5 +70,25 @@ jobs:
           assert landing["volumes"] == [d + "/landing:/usr/share/nginx/html:ro"]
           print("RESULT=UPDATER_COMPOSE_SEMANTICS_PASS")
           PY
+      - name: Check published GHCR image and linux/amd64 platform (read-only)
+        run: |
+          python3 - <<'PY' > "$RUNNER_TEMP/pinned-tag"
+          from pathlib import Path
+          import re
+          s = Path("mochilab-openbot/docker-compose.yml").read_text()
+          m = re.findall(r"(?m)^    image: (ghcr\.io/nightly-labs/openbot:\d+\.\d+\.\d+)$", s)
+          assert len(m) == 1
+          print(m[0])
+          PY
+          docker manifest inspect "$(cat "$RUNNER_TEMP/pinned-tag")" > "$RUNNER_TEMP/openbot-image-manifest.json"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          obj = json.loads((Path(os.environ["RUNNER_TEMP"]) / "openbot-image-manifest.json").read_text())
+          platforms = [v.get("platform", {}) for v in obj.get("manifests", []) if isinstance(v, dict)]
+          assert any(p.get("os") == "linux" and p.get("architecture") == "amd64"
+                     for p in platforms), "linux/amd64 tag unavailable"
+          print("GHCR_OPENBOT_VERSIONED_LINUX_AMD64_IMAGE=PASS")
+          PY
       - name: No checkout modifications
         run: git diff --exit-code
