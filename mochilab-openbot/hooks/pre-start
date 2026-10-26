@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenBot 0.49.0: verify seccomp and load one OpenBot-only AppArmor policy.
+# OpenBot 0.50.0: retain pinned upstream seccomp and reviewed V3 workspace policy.
 # This hook never changes docker-default, Docker daemon config, or sysctls.
 set -euo pipefail
 APP_DIR="${APP_DATA_DIR:-$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")}"
@@ -46,6 +46,66 @@ if [[ ! -r /sys/kernel/security/apparmor/profiles ]] || \
   "$PARSER" -r -T -K "$APPARMOR_PROFILE"
 fi
 # Fail closed: Docker refuses to launch when the named profile is unavailable.
+
+# Umbrel App Store updates copy hooks/ but NOT arbitrary root policy files.
+# Distribute the exact reviewed seccomp artifact under hooks/ and restore a
+# missing app-root copy on clean installation. Never overwrite a modified one.
+# Both existing V3 installations and clean installs use the same pinned bytes.
+V3_SEC_SOURCE="${APP_DIR}/hooks/seccomp-workspace.json"
+V3_SEC_TARGET="${APP_DIR}/seccomp-workspace.json"
+V3_SEC_HASH="4fa610c6303f4610844dc6ae0da5546030a77cbb"
+[[ -f "$V3_SEC_SOURCE" && ! -L "$V3_SEC_SOURCE" ]] || {
+  echo 'OpenBot: packaged V3 seccomp missing or symlink' >&2; exit 1;
+}
+[[ "$(git hash-object "$V3_SEC_SOURCE")" == "$V3_SEC_HASH" ]] || {
+  echo 'OpenBot: packaged V3 seccomp modified' >&2; exit 1;
+}
+if [[ ! -e "$V3_SEC_TARGET" && ! -L "$V3_SEC_TARGET" ]]; then
+  V3_TEMP="$(mktemp "${APP_DIR}/.seccomp-workspace.XXXXXX")"
+  if ! cp -- "$V3_SEC_SOURCE" "$V3_TEMP" || \
+     ! chmod 0644 "$V3_TEMP" || \
+     [[ "$(git hash-object "$V3_TEMP")" != "$V3_SEC_HASH" ]]; then
+    rm -f -- "$V3_TEMP"
+    echo 'OpenBot: V3 seccomp staging failed' >&2; exit 1;
+  fi
+  # GNU mv -n refuses to overwrite if another startup created the target.
+  mv -n -- "$V3_TEMP" "$V3_SEC_TARGET"
+  if [[ -e "$V3_TEMP" ]]; then rm -f -- "$V3_TEMP"; fi
+fi
+[[ -f "$V3_SEC_TARGET" && ! -L "$V3_SEC_TARGET" ]] || {
+  echo 'OpenBot: V3 seccomp target missing or unsafe' >&2; exit 1;
+}
+[[ "$(git hash-object "$V3_SEC_TARGET")" == "$V3_SEC_HASH" ]] || {
+  echo 'OpenBot: V3 seccomp target differs; refusing update' >&2; exit 1;
+}
+
+# V3 reviewed workspace sandbox: only load the distinct OpenBot workspace profile.
+# Keep the original upstream seccomp and original AppArmor profile untouched.
+# This profile is expanded relative to production. Never use without approval.
+WORKSPACE_APPARMOR="${APP_DIR}/hooks/mochilab-openbot-workspace.apparmor"
+WORKSPACE_SECCOMP="${APP_DIR}/seccomp-workspace.json"
+WORKSPACE_AA_GIT_SHA="afd0d87e7a09e39afad12864fb988586ce95104e"
+WORKSPACE_SC_GIT_SHA="4fa610c6303f4610844dc6ae0da5546030a77cbb"
+[[ -f "$WORKSPACE_APPARMOR" && ! -L "$WORKSPACE_APPARMOR" ]] || {
+  echo 'OpenBot: V3 workspace AppArmor artifact missing/unsafe' >&2; exit 1;
+}
+[[ -f "$WORKSPACE_SECCOMP" && ! -L "$WORKSPACE_SECCOMP" ]] || {
+  echo 'OpenBot: V3 workspace Seccomp artifact missing/unsafe' >&2; exit 1;
+}
+[[ "$(git hash-object "$WORKSPACE_APPARMOR")" == "$WORKSPACE_AA_GIT_SHA" ]] || {
+  echo 'OpenBot: V3 workspace AppArmor checksum mismatch' >&2; exit 1;
+}
+[[ "$(git hash-object "$WORKSPACE_SECCOMP")" == "$WORKSPACE_SC_GIT_SHA" ]] || {
+  echo 'OpenBot: V3 workspace Seccomp checksum mismatch' >&2; exit 1;
+}
+"$PARSER" -Q -T -K "$WORKSPACE_APPARMOR"
+# Reload the scoped label from the hash-verified artifact on every app start.
+# Name is distinct from docker-default and the existing mochilab-openbot label.
+"$PARSER" -r -T -K "$WORKSPACE_APPARMOR"
+[[ -r /sys/kernel/security/apparmor/profiles ]] && \
+  grep -Fxq 'mochilab-openbot-workspace (enforce)' /sys/kernel/security/apparmor/profiles || {
+  echo 'OpenBot: V3 workspace AppArmor not loaded in enforce mode' >&2; exit 1;
+}
 
 # Keep the Umbrel dock icon, but go directly to the upstream OpenBot Web App.
 # Umbrel app updates only copy whitelisted paths (including hooks/), not landing/.

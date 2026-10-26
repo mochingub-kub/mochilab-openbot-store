@@ -1,0 +1,95 @@
+name: Review newer stable OpenBot releases
+
+on:
+  schedule:
+    # 06:17 in Asia/Bangkok; runs only after merged into main
+    - cron: '17 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: openbot-stable-review-proposal
+  cancel-in-progress: false
+
+jobs:
+  prepare-draft:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Propose stable release only when upstream security is unchanged
+        id: propose
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/openbot_release_plan.py --prepare-latest | tee "$RUNNER_TEMP/updater-result"
+          if grep -Fxq 'RESULT=REVIEW_CANDIDATE_PREPARED' "$RUNNER_TEMP/updater-result"; then
+            target="$(sed -n 's/^REVIEW_TARGET_VERSION=//p' "$RUNNER_TEMP/updater-result")"
+            [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 2
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            echo "version=$target" >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Verify full package and published Linux Docker image
+        if: steps.propose.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip -q install 'PyYAML==6.0.2'
+          python3 -m unittest discover -s tools -p 'test_openbot*.py' -v
+          python3 tools/openbot_release_plan.py --check-current
+          bash -n mochilab-openbot/hooks/pre-start
+          test -x mochilab-openbot/hooks/pre-start
+          docker manifest inspect "ghcr.io/nightly-labs/openbot:${{ steps.propose.outputs.version }}" > "$RUNNER_TEMP/image-manifest.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "image-manifest.json").read_text())
+          targets = [
+              m.get("platform", {}) for m in data.get("manifests", [])
+              if isinstance(m, dict)
+          ]
+          assert any(p.get("os") == "linux" and p.get("architecture") == "amd64"
+                     for p in targets), "Missing published linux/amd64 image"
+          print("GHCR_RELEASE_IMAGE_LINUX_AMD64=PASS")
+          PY
+      - name: Create draft PR only; never merge or deploy
+        if: steps.propose.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.propose.outputs.version }}"
+          branch="release/openbot-$version-review"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "DRAFT_BRANCH_ALREADY_EXISTS=$branch; no overwrite"
+            exit 0
+          fi
+          git diff --check
+          actual="$(git diff --name-only)"
+          expected="$(printf 'mochilab-openbot/docker-compose.yml\nmochilab-openbot/umbrel-app.yml')"
+          [[ "$actual" == "$expected" ]] || {
+            echo 'BLOCKED=UNEXPECTED_PACKAGE_CHANGE' >&2
+            exit 2
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -- mochilab-openbot/docker-compose.yml mochilab-openbot/umbrel-app.yml
+          git commit -m "chore(openbot): propose stable $version for review"
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title "Review OpenBot $version (DO NOT DEPLOY YET)" \
+            --body "Automatically prepared candidate for OpenBot $version. The V3 AppArmor/Seccomp and mounts were not changed. Upstream pinned seccomp blob and linux/amd64 GHCR image were checked. **Draft review only:** do not merge without an independently verified stopped-data backup, restart plan, functional V3 rechecks and owner approval. No production action has been performed."
