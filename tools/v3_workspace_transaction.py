@@ -266,6 +266,9 @@ def safe_transaction(path):
         fail("TRANSACTION_PATH_INVALID")
     if not path.name.startswith(".mochilab-openbot-v3-"):
         fail("TRANSACTION_ID_INVALID")
+    st = path.stat()
+    if st.st_uid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
+        fail("TRANSACTION_OWNERSHIP_OR_PERMISSIONS_UNSAFE")
     regular(path / "manifest.json")
     m = json.loads((path / "manifest.json").read_text())
     if m.get("schema") != "mochilab-openbot-workspace-v3" or m.get("app") != str(APP):
@@ -370,20 +373,33 @@ def stage(parent):
 
 
 def verify():
-    source, before, candidate = plan_candidate((APP / "docker-compose.yml").read_text()), None, None
-    # Stage has no live code execution. Check the requested settings at runtime.
+    # Check new files and effective container security; no tool/model calls.
+    owned_root()
+    for rel, expected in STAGED.items():
+        if git_sha(APP / rel) != expected:
+            fail("STAGED_ARTIFACT_DRIFT_" + rel.replace("/", "_"))
     info = docker_info()
-    if info.get("AppArmorProfile") != "mochilab-openbot-workspace":
-        fail("RUNTIME_WORKSPACE_APPARMOR_NOT_APPLIED")
     if not info.get("State", {}).get("Running"):
         fail("RUNTIME_NOT_RUNNING")
+    if info.get("AppArmorProfile") != "mochilab-openbot-workspace":
+        fail("RUNTIME_WORKSPACE_APPARMOR_NOT_APPLIED")
     hc = info.get("HostConfig", {})
     if hc.get("Privileged") or hc.get("CapAdd"):
         fail("RUNTIME_PRIVILEGE_DRIFT")
-    if "no-new-privileges:true" not in (hc.get("SecurityOpt") or []):
+    opts = hc.get("SecurityOpt") or []
+    if "apparmor=mochilab-openbot-workspace" not in opts:
+        fail("WORKSPACE_APPARMOR_OPTION_MISSING")
+    if not any(x.startswith("seccomp=") for x in opts):
+        fail("WORKSPACE_SECCOMP_OPTION_MISSING")
+    if "no-new-privileges:true" not in opts:
         fail("RUNTIME_NNP_MISSING")
+    mounts = info.get("Mounts") or []
+    if len(mounts) != 1 or mounts[0].get("Destination") != "/data" or not mounts[0].get("RW"):
+        fail("RUNTIME_MOUNT_DRIFT")
+    if Path(mounts[0].get("Source", "")).resolve() != (APP / "data").resolve():
+        fail("RUNTIME_DATA_SOURCE_DRIFT")
     print("RESULT=V3_CONTAINER_SECURITY_BASELINE_ONLY")
-    print("CODEX_WORKSPACE_FUNCTIONAL_TEST=NOT_RUN")
+    print("BWRAP_AND_CODEX_WORKSPACE_FUNCTIONAL_TESTS=NOT_RUN")
 
 
 def main():
