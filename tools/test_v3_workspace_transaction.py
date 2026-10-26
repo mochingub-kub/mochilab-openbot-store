@@ -32,6 +32,7 @@ class Transaction(unittest.TestCase):
         self.app_patch = mock.patch.object(tx, "APP", self.app)
         self.app_patch.start()
         self.addCleanup(self.app_patch.stop)
+        self.actual_check_live_baseline = tx.check_live_baseline
         self.patchers = [
             mock.patch.object(tx, "check_stopped", side_effect=lambda: True),
             mock.patch.object(tx, "check_live_baseline", side_effect=lambda **_: True),
@@ -144,7 +145,7 @@ class Transaction(unittest.TestCase):
             ],
         }
         with mock.patch.object(tx, "docker_info", return_value=obj):
-            original = tx.check_live_baseline
+            original = self.actual_check_live_baseline
             original(require_running=False)
             with self.assertRaises(tx.Blocked):
                 original(require_running=True)
