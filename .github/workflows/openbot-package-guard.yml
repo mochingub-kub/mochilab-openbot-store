@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install pinned YAML parser for strict host-volume validation
+        run: python3 -m pip -q install 'PyYAML==6.0.2'
       - name: Verify security-gated release package
         run: |
           python3 tools/openbot_release_plan.py --check-current
@@ -39,7 +41,6 @@ jobs:
           test ! -L mochilab-openbot/hooks/pre-start
       - name: Validate package YAML and Docker Compose semantics
         run: |
-          python3 -m pip -q install 'PyYAML==6.0.2'
           python3 - <<'PY'
           from pathlib import Path
           import yaml
