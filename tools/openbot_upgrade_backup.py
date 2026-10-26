@@ -69,9 +69,13 @@ def regular(file):
     return st
 
 
-def check_app():
+def require_root():
     if os.geteuid() != 0:
         block("REQUIRES_ROOT_ON_UMBREL_HOST")
+
+
+def check_app():
+    require_root()
     if APP.is_symlink() or not APP.is_dir() or APP.resolve(strict=True) != APP:
         block("APP_ROOT_CHANGED")
     data = APP / "data"
@@ -216,11 +220,11 @@ def safe_snapshot(path):
     if path.is_symlink() or not path.is_dir() or path.resolve(strict=True) != path:
         block("SNAPSHOT_DIRECTORY_UNSAFE")
     info = path.stat()
-    if info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o700:
+    if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
         block("SNAPSHOT_PERMISSIONS_UNSAFE")
     marker = path / "manifest.json"
     regular(marker)
-    if marker.stat().st_uid != 0 or stat.S_IMODE(marker.stat().st_mode) != 0o600:
+    if marker.stat().st_uid != os.geteuid() or stat.S_IMODE(marker.stat().st_mode) != 0o600:
         block("SNAPSHOT_MANIFEST_PERMISSIONS_UNSAFE")
     m = json.loads(marker.read_text(encoding="utf-8"))
     if m.get("schema") != SCHEMA or m.get("state") != "FILE_BACKUP_CHECKSUM_VERIFIED" or m.get("source") != str(APP):
@@ -238,8 +242,7 @@ def safe_snapshot(path):
 
 
 def rehearse(path):
-    if os.geteuid() != 0:
-        block("REQUIRES_ROOT_ON_UMBREL_HOST")
+    require_root()
     independent_disk()
     m = safe_snapshot(path)
     if shutil.which("rsync") is None:
