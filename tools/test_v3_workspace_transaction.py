@@ -34,6 +34,7 @@ class Transaction(unittest.TestCase):
         self.addCleanup(self.app_patch.stop)
         self.patchers = [
             mock.patch.object(tx, "check_stopped", side_effect=lambda: True),
+            mock.patch.object(tx, "check_live_baseline", side_effect=lambda **_: True),
             mock.patch.object(tx, "check_installed",
                               side_effect=lambda: ("sample", "baseline-hash", "new simulated compose\n")),
             mock.patch.object(tx, "check_artifacts", return_value=self.policy),
