@@ -137,7 +137,20 @@ def check_artifacts():
         if git_sha(file) != expected:
             fail("REVIEW_ARTIFACT_DRIFT_" + file.name)
     run(["apparmor_parser", "-Q", "-T", "-K", str(base / "mochilab-openbot-workspace.apparmor")])
+    require_fresh_workspace_profile()
     return base
+
+
+def require_fresh_workspace_profile(profiles=Path("/sys/kernel/security/apparmor/profiles")):
+    """Never reload an unknown existing kernel policy with the candidate name."""
+    if not profiles.is_file():
+        fail("APPARMOR_KERNEL_PROFILE_LIST_UNAVAILABLE")
+    try:
+        names = profiles.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        fail("APPARMOR_KERNEL_PROFILE_LIST_UNREADABLE")
+    if any(line.startswith("mochilab-openbot-workspace (") for line in names):
+        fail("WORKSPACE_PROFILE_ALREADY_LOADED_REQUIRES_REVIEW")
 
 
 def docker_info():
