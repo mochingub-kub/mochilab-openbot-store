@@ -46,7 +46,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s tools -p 'test_openbot_release_plan.py' -v
+          python3 -m pip -q install 'PyYAML==6.0.2'
+          python3 -m unittest discover -s tools -p 'test_openbot*.py' -v
           python3 tools/openbot_release_plan.py --check-current
           bash -n mochilab-openbot/hooks/pre-start
           test -x mochilab-openbot/hooks/pre-start
