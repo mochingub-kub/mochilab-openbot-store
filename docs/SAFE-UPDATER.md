@@ -56,6 +56,7 @@ The old `tools/openbot_upgrade_backup.py` validates the **exact historical 0.49.
 | Provider auth folders, browser data, `data/.cache`, local fonts | May be needed for sign-in, browser, runtime, or Thai glyph support; no measured cache bloat | **Do not manually clear** |
 | External pre-0.52 snapshot | Critical rollback checkpoint for migration 47 | **Keep** |
 | Older external snapshots (four sets) | Potential retention candidates; contents/restore not fully validated | **Hold for separate, explicit deletion approval** |
+| Unrelated Umbrel Community Store `https://github.com/CopilotKit/openbot` | This machine currently logs repeated `Failed to read registry` errors for this URL; it is **not** the Mochilab OpenBot source | **Candidate for UI removal after confirming no other installed app uses it**; Umbrel MCP does not expose a store-removal operation |
 | Legacy backup helper and its tests in GitHub | Historical/CI reference; not compatible with current live app | **Retain and label legacy** |
 
 There is substantial internal free space, so cache removal is not justified without a measured issue. The existing Umbrel MCP can inspect the external backup directory, but does not authorize permanent deletion from USB storage. Do not silently remove any backup and never touch unrelated photo storage.
