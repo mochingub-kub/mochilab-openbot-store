@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# OpenBot 0.49.0: verify seccomp and load one OpenBot-only AppArmor policy.
+# This hook never changes docker-default, Docker daemon config, or sysctls.
+set -euo pipefail
+APP_DIR="${APP_DATA_DIR:-$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")}"
+SECCOMP="${APP_DIR}/seccomp-0.49.0.json"
+SECCOMP_URL="https://raw.githubusercontent.com/nightly-labs/openbot/v0.49.0/docker/seccomp.json"
+SECCOMP_GIT_SHA="6e42d0bd8e904f5ddddaf3c6c7c50f1dc2d72418"
+APPARMOR_PROFILE="${APP_DIR}/hooks/mochilab-openbot.apparmor"
+APPARMOR_GIT_SHA="fc27398ef8a2404f2c2f0ef7e6aaab411a9ec73a"
+
+# The upstream profile is a pinned release artifact; do not use unconfined.
+command -v git >/dev/null || { echo 'OpenBot: git is required to verify seccomp' >&2; exit 1; }
+if [[ ! -f "$SECCOMP" ]] || [[ "$(git hash-object "$SECCOMP")" != "$SECCOMP_GIT_SHA" ]]; then
+  command -v curl >/dev/null || { echo 'OpenBot: curl is required to obtain seccomp' >&2; exit 1; }
+  TMP="$(mktemp "${APP_DIR}/.seccomp-0.49.0.XXXXXX")"
+  trap 'rm -f "$TMP"' EXIT
+  curl --fail --location --silent --show-error --retry 2 --connect-timeout 10 --max-time 60 \
+    "$SECCOMP_URL" --output "$TMP"
+  [[ "$(git hash-object "$TMP")" == "$SECCOMP_GIT_SHA" ]] || {
+    echo 'OpenBot: seccomp checksum mismatch; refusing file' >&2
+    exit 1
+  }
+  chmod 0644 "$TMP"
+  mv -f "$TMP" "$SECCOMP"
+fi
+
+# AppArmor stays in enforce mode; only this named OpenBot profile gains userns create.
+[[ -f "$APPARMOR_PROFILE" ]] || { echo 'OpenBot: AppArmor policy missing' >&2; exit 1; }
+[[ "$(git hash-object "$APPARMOR_PROFILE")" == "$APPARMOR_GIT_SHA" ]] || {
+  echo 'OpenBot: AppArmor policy was modified; refusing to load' >&2
+  exit 1
+}
+PARSER="$(command -v apparmor_parser || true)"
+if [[ -z "$PARSER" ]]; then
+  for candidate in /usr/sbin/apparmor_parser /sbin/apparmor_parser; do
+    if [[ -x "$candidate" ]]; then PARSER="$candidate"; break; fi
+  done
+fi
+[[ -n "$PARSER" ]] || { echo 'OpenBot: AppArmor parser unavailable' >&2; exit 1; }
+
+# Parse without touching the kernel or cache, then load only mochilab-openbot.
+"$PARSER" -Q -T -K "$APPARMOR_PROFILE"
+if [[ ! -r /sys/kernel/security/apparmor/profiles ]] || \
+   ! grep -Fxq 'mochilab-openbot (enforce)' /sys/kernel/security/apparmor/profiles; then
+  "$PARSER" -r -T -K "$APPARMOR_PROFILE"
+fi
+# Fail closed: Docker refuses to launch when the named profile is unavailable.
+
+# V3 reviewed workspace sandbox: only load the distinct OpenBot workspace profile.
+# Keep the original upstream seccomp and original AppArmor profile untouched.
+# This profile is expanded relative to production. Never use without approval.
+WORKSPACE_APPARMOR="${APP_DIR}/hooks/mochilab-openbot-workspace.apparmor"
+WORKSPACE_SECCOMP="${APP_DIR}/seccomp-workspace.json"
+WORKSPACE_AA_GIT_SHA="afd0d87e7a09e39afad12864fb988586ce95104e"
+WORKSPACE_SC_GIT_SHA="4fa610c6303f4610844dc6ae0da5546030a77cbb"
+[[ -f "$WORKSPACE_APPARMOR" && ! -L "$WORKSPACE_APPARMOR" ]] || {
+  echo 'OpenBot: V3 workspace AppArmor artifact missing/unsafe' >&2; exit 1;
+}
+[[ -f "$WORKSPACE_SECCOMP" && ! -L "$WORKSPACE_SECCOMP" ]] || {
+  echo 'OpenBot: V3 workspace Seccomp artifact missing/unsafe' >&2; exit 1;
+}
+[[ "$(git hash-object "$WORKSPACE_APPARMOR")" == "$WORKSPACE_AA_GIT_SHA" ]] || {
+  echo 'OpenBot: V3 workspace AppArmor checksum mismatch' >&2; exit 1;
+}
+[[ "$(git hash-object "$WORKSPACE_SECCOMP")" == "$WORKSPACE_SC_GIT_SHA" ]] || {
+  echo 'OpenBot: V3 workspace Seccomp checksum mismatch' >&2; exit 1;
+}
+"$PARSER" -Q -T -K "$WORKSPACE_APPARMOR"
+# Reload the scoped label from the hash-verified artifact on every app start.
+# Name is distinct from docker-default and the existing mochilab-openbot label.
+"$PARSER" -r -T -K "$WORKSPACE_APPARMOR"
+[[ -r /sys/kernel/security/apparmor/profiles ]] && \
+  grep -Fxq 'mochilab-openbot-workspace (enforce)' /sys/kernel/security/apparmor/profiles || {
+  echo 'OpenBot: V3 workspace AppArmor not loaded in enforce mode' >&2; exit 1;
+}
+
+# Keep the Umbrel dock icon, but go directly to the upstream OpenBot Web App.
+# Umbrel app updates only copy whitelisted paths (including hooks/), not landing/.
+# The redirect is a static page, not a credential proxy; no API keys or secrets.
+REDIRECT_SOURCE="${APP_DIR}/hooks/openbot-direct.html"
+LANDING_DIR="${APP_DIR}/landing"
+LANDING_PAGE="${LANDING_DIR}/index.html"
+if [[ -f "$REDIRECT_SOURCE" && -d "$LANDING_DIR" && ! -L "$LANDING_PAGE" ]] && \
+   ! cmp -s "$REDIRECT_SOURCE" "$LANDING_PAGE"; then
+  LANDING_TMP="$(mktemp "${LANDING_DIR}/.openbot-redirect.XXXXXX" 2>/dev/null || true)"
+  if [[ -n "$LANDING_TMP" ]] && \
+     cp "$REDIRECT_SOURCE" "$LANDING_TMP" && \
+     chmod 0644 "$LANDING_TMP" && \
+     mv -f "$LANDING_TMP" "$LANDING_PAGE"; then
+    echo 'OpenBot: Umbrel dock now opens the web client directly.'
+  else
+    [[ -z "$LANDING_TMP" ]] || rm -f "$LANDING_TMP"
+    echo 'OpenBot: launcher redirect could not be updated; keeping OpenBot engine available.' >&2
+  fi
+fi
