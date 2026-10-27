@@ -32,6 +32,18 @@ The old `tools/openbot_upgrade_backup.py` validates the **exact historical 0.49.
 5. Restart OpenBot; confirm it is `ready`, then check login and Agent functionality separately. An isolated restore rehearsal is needed before claiming recoverability.
 6. Record the date, source app version, backup type, validation actually done, and restore-test status. Do not publish backup contents or secret values.
 
+## One retained backup: rotation policy (not yet automated)
+
+The owner's target is **one verified current-version backup after each completed rotation**, not an unlimited history. This is a retention policy, **not an implemented updater or cleanup script**. The GitHub release-watch workflow only proposes Draft PRs; it does not back up production. Do not run the legacy 0.49 helper against 0.52.
+
+1. **Normal state:** retain one full, access-restricted OpenBot app-tree backup on the independent external HDD, including the database, hidden `/data` files, keyrings and keyring-password, Agents, and matching app configuration. Record source version and integrity/restore evidence. The live app's data is not itself a backup.
+2. **Before an approved production upgrade:** inspect whether that copy is recent, complete, and a valid rollback point for the installed version and any planned data migration. If it is stale or missing, stop OpenBot and create a second **temporary** snapshot without modifying the known-good one. Check capacity first; fail closed if there is insufficient independent space. Do not back up just because a GitHub release was detected.
+3. **After the upgrade:** validate real app login, Agent/Thread histories, provider turns, and app/security settings. Create or select a backup matching the *new running version*, perform file integrity and relevant database checks, and rehearse restoration in isolation. A directory listing, matching file sizes, and `ready` alone do not qualify.
+4. **Promote and prune:** after a recoverable backup is confirmed, retire superseded snapshots using an explicit, reviewed list of **exact snapshot directories** and separate owner authorization. Never use an unbounded wildcard, broad `rsync --delete`, or automatically delete a known-good backup on update failure. Leave unrelated `PhotoLibrary` untouched. If validation fails, keep the old rollback and stop cleanup.
+5. **Historical migration exception:** the existing pre-0.52 backup is the rollback point for migration 47, **not** a backup of data created on current 0.52. Keep it until the current-version full backup and isolated recovery plan are validated and the owner accepts losing the old-version rollback option.
+
+At the time of this review, the HDD still has **five** historical snapshots; none has passed a confirmed full application restore test, and no automatic rotation is active. Do **not** claim that the one-backup target has already been achieved.
+
 ## Upstream Stable upgrades
 
 1. Query current upstream Stable release, read migration/permission notes, and inspect actual installed Umbrel app/version/images.
@@ -54,9 +66,9 @@ The old `tools/openbot_upgrade_backup.py` validates the **exact historical 0.49.
 | `data/.config/OpenBot/openbot.db`, `data/OpenBot/Agents` | Persistent chats/agents and migration state | **Keep** |
 | `data/.local/share/keyrings` and `data/.config/openbot-container` | Essential encryption keys/password dependencies | **Keep** |
 | Provider auth folders, browser data, `data/.cache`, local fonts | May be needed for sign-in, browser, runtime, or Thai glyph support; no measured cache bloat | **Do not manually clear** |
-| External pre-0.52 snapshot | Critical rollback checkpoint for migration 47 | **Keep** |
-| Older external snapshots (four sets) | Potential retention candidates; contents/restore not fully validated | **Hold for separate, explicit deletion approval** |
-| Unrelated Umbrel Community Store `https://github.com/CopilotKit/openbot` | This machine currently logs repeated `Failed to read registry` errors for this URL; it is **not** the Mochilab OpenBot source | **Candidate for UI removal after confirming no other installed app uses it**; Umbrel MCP does not expose a store-removal operation |
+| External pre-0.52 snapshot | Historical rollback checkpoint for migration 47; not a current 0.52 backup | **Keep until new recoverable backup and owner-approved retirement** |
+| Older external snapshots (four sets) | Retention candidates; no verified full restore or safe-to-delete decision yet | **Hold until a current-version recoverable copy exists and the owner approves exact deletion targets** |
+| Unrelated Umbrel Community Store `https://github.com/CopilotKit/openbot` | Removed on 27 Oct 2026 via Umbrel CLI; system logs confirmed removal and later store checks no longer requested it | **Resolved — do not re-add** |
 | Legacy backup helper and its tests in GitHub | Historical/CI reference; not compatible with current live app | **Retain and label legacy** |
 
 There is substantial internal free space, so cache removal is not justified without a measured issue. The existing Umbrel MCP can inspect the external backup directory, but does not authorize permanent deletion from USB storage. Do not silently remove any backup and never touch unrelated photo storage.
