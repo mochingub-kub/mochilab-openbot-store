@@ -24,7 +24,7 @@ OpenBot 0.52.0 migrates legacy Tasks into multiple conversation Threads (databas
 ## Install / connect
 
 1. In Umbrel, go to **App Store > Community App Stores** and add `https://github.com/mochingub-kub/mochilab-openbot-store`.
-2. Install OpenBot from the **Mochilab** store.
+2. Install OpenBot from the **Mochilab** store. **Do not add** `https://github.com/CopilotKit/openbot` as a substitute: it is a different project and not an Umbrel App Store registry.
 3. Open the Umbrel app icon. The local, unprivileged redirect opens `https://openbot.run/app` while the OpenBot engine stays on Umbrel.
 4. For a first-time engine login only, use an **UmbrelOS host** SSH session (not Portainer's Docker-in-Docker):
 
