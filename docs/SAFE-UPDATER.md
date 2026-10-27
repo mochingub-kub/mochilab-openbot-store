@@ -32,6 +32,18 @@ The old `tools/openbot_upgrade_backup.py` validates the **exact historical 0.49.
 5. Restart OpenBot; confirm it is `ready`, then check login and Agent functionality separately. An isolated restore rehearsal is needed before claiming recoverability.
 6. Record the date, source app version, backup type, validation actually done, and restore-test status. Do not publish backup contents or secret values.
 
+## Current backup helper: staged, not running on production
+
+The new tool is `tools/openbot_backup_current.py`. It is a reviewed proposal, not a scheduled job or a deployed host service. Do not use `tools/openbot_upgrade_backup.py` for the current 0.52 installation: that file is intentionally pinned to the legacy 0.49 state.
+
+- **Preflight only (no writes):** `sudo python3 tools/openbot_backup_current.py --preflight` on the **UmbrelOS host**, from a reviewed local checkout. It checks the known app data path, configuration/version, pinned security hashes, complete important data files, HDD mount, distinct physical disk, filesystem, backup space, and required tools. Any unexpected layout blocks execution. Do not assume this host-specific script works on another Umbrel setup.
+- **List snapshots (no writes):** `sudo python3 tools/openbot_backup_current.py --inventory`. This lists candidate backup directory names without inspecting secret values.
+- **Create only after an authorized maintenance stop:** Stop *only OpenBot* using Umbrel's app controls, verify it is stopped, then run `sudo python3 tools/openbot_backup_current.py --backup` from the reviewed checkout. It requires typing `BACKUP-OPENBOT`, checks Umbrel and Docker stopped state again, and copies the **entire app tree**, including hidden data, settings, keyrings and agents. It compares the source and copied files and hashes their contents. If a check fails, the new folder is *incomplete*; the script never deletes old snapshots or retries by overwriting them. OpenBot remains stopped; start it through Umbrel afterward and test login and Agent replies.
+- **Verify:** `sudo python3 tools/openbot_backup_current.py --verify /home/umbrel/umbrel/external/mochi-external/SNAPSHOT_NAME`. Requires the *exact* snapshot directory created by this helper, checks a private manifest and every file hash.
+- **Disposable file restore rehearsal:** `sudo python3 tools/openbot_backup_current.py --rehearse /home/umbrel/umbrel/external/mochi-external/SNAPSHOT_NAME`. Copies the snapshot into a private temporary directory on that same external HDD, checks every copied file, and runs SQLite `PRAGMA quick_check` against the **disposable copy**. The temporary restore directory is removed afterwards. This is **file-level recovery evidence only**; it cannot prove that an isolated OpenBot instance can authenticate, decrypt secrets, and load all agents.
+
+**Hard limits:** No scheduling, automatic snapshot creation on update detection, old-backup pruning, Docker update, host config mutation, or production restore is implemented. No existing HDD snapshot has been deleted. For actual implementation, obtain the exact reviewed GitHub commit and check its SHA-256 before using any downloaded script as root; never pipe a remote script directly to `sudo`. No tokens, password files, manifest contents, or backup data belong in GitHub.
+
 ## One retained backup: rotation policy (not yet automated)
 
 The owner's target is **one verified current-version backup after each completed rotation**, not an unlimited history. This is a retention policy, **not an implemented updater or cleanup script**. The GitHub release-watch workflow only proposes Draft PRs; it does not back up production. Do not run the legacy 0.49 helper against 0.52.
