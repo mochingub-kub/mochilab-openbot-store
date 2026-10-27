@@ -257,12 +257,14 @@ def backup():
     check_app()
     check_storage()
     name = PREFIX + dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(4)
-    path = PARENT / name
-    path.mkdir(mode=0o700)
-    path.chmod(0o700)
-    destination = path / 'app'
-    destination.mkdir(mode=0o700)
-    try:
+    final_path = PARENT / name
+    require(not final_path.exists(), 'BACKUP_TARGET_COLLISION')
+    # Only a newly created private staging directory is auto-removed on failure.
+    # Existing snapshots are never overwritten or removed.
+    with tempfile.TemporaryDirectory(prefix='.mochilab-openbot-staging-', dir=PARENT) as stage:
+        path = Path(stage)
+        destination = path / 'app'
+        destination.mkdir(mode=0o700)
         run(['rsync', '-aHAX', '--numeric-ids', '--', str(APP) + '/', str(destination) + '/'])
         check_stopped()
         changed = run(['rsync', '-aHAXnci', '--delete', '--numeric-ids', '--',
@@ -281,10 +283,10 @@ def backup():
             json.dump(metadata, stream, indent=2, sort_keys=True)
             stream.write('\n')
         marker.chmod(0o600)
-        verify_snapshot(path)
-    except Exception:
-        print('INCOMPLETE_SNAPSHOT_NEEDS_REVIEW=' + name, file=sys.stderr)
-        raise
+        check_stopped()
+        # Same-filesystem rename promotes a fully checked copy atomically.
+        path.rename(final_path)
+    verify_snapshot(final_path)
     print('RESULT=OPENBOT_CURRENT_FILE_BACKUP_VERIFIED')
     print('SNAPSHOT=' + name)
     print('APP_STILL_STOPPED=YES')
