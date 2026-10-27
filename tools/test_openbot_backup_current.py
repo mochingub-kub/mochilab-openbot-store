@@ -152,6 +152,7 @@ class BackupCurrentTests(TestCase):
                     bk.backup()
         self.assertTrue(previous.is_dir())
         self.assertEqual(sum(1 for p in self.parent.iterdir() if (p / 'manifest.json').exists()), 1)
+        self.assertFalse(list(self.parent.glob('.mochilab-openbot-staging-*')))
 
     def test_backup_blocks_file_mismatch_and_marks_incomplete(self):
         previous = self._backup()
@@ -169,6 +170,7 @@ class BackupCurrentTests(TestCase):
                     bk.backup()
         self.assertTrue(previous.is_dir())
         self.assertEqual(sum(1 for p in self.parent.iterdir() if (p / 'manifest.json').exists()), 1)
+        self.assertFalse(list(self.parent.glob('.mochilab-openbot-staging-*')))
 
 
 class StrictConfigTests(TestCase):
