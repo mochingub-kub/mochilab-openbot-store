@@ -57,6 +57,8 @@ The external HDD also contains four older OpenBot backup generations. These are 
 
 The old `tools/openbot_upgrade_backup.py` is a **0.49-to-0.50 legacy backup helper**. Its preflight intentionally requires the old 0.49 package and will reject the live 0.52 installation. Do **not** present it as the current backup solution. Retain the script and tests for historical recovery evidence until a reviewed replacement exists.
 
+A new staged backup tool is provided at `tools/openbot_backup_current.py` with synthetic tests in `tools/test_openbot_backup_current.py`. It can preflight, make a **stopped-app** checksum-verified full app-tree copy, verify a copy, and rehearse a disposable **file-level** restore. It has **no delete/prune command** and has not yet run on Mochilab. Read `docs/SAFE-UPDATER.md` before running any host command. A file-level test is not a full-app restore test.
+
 ## Update workflow
 
 1. Inspect the actual installed version, upstream Stable release, app-store manifest, current image and security/volume settings.
