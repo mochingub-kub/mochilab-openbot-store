@@ -220,7 +220,7 @@ def snapshot_path(path):
     require(path.is_dir() and not path.is_symlink() and path.resolve() == path,
             'SNAPSHOT_NOT_REAL_DIRECTORY')
     st = path.stat()
-    require(st.st_uid == 0 and stat.S_IMODE(st.st_mode) == 0o700,
+    require(st.st_uid == os.geteuid() and stat.S_IMODE(st.st_mode) == 0o700,
             'SNAPSHOT_ROOT_NOT_PRIVATE')
     return path
 
@@ -230,7 +230,7 @@ def verify_snapshot(path):
     marker = path / 'manifest.json'
     require(marker.is_file() and not marker.is_symlink(), 'BACKUP_MANIFEST_MISSING')
     st = marker.stat()
-    require(st.st_uid == 0 and stat.S_IMODE(st.st_mode) == 0o600,
+    require(st.st_uid == os.geteuid() and stat.S_IMODE(st.st_mode) == 0o600,
             'BACKUP_MANIFEST_NOT_PRIVATE')
     require(st.st_size < 64 * 1024**2, 'BACKUP_MANIFEST_OVERSIZED')
     meta = json.loads(marker.read_text('utf-8'))
