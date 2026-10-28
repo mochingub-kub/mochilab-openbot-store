@@ -5,7 +5,7 @@ storage:
 category: ai
 name: OpenBot
 tagline: Persistent AI teammates on your Umbrel
-version: "0.52.0-1"
+version: "0.52.1-1"
 description: >-
   Run the official OpenBot Docker server on your own umbrelOS device.
   OpenBot works in the background and you connect through the OpenBot web or desktop client.
@@ -22,7 +22,7 @@ description: >-
   data directory, does not mount the host Docker socket, and publishes no OpenBot port.
   Back up the complete app data folder before upgrades.
 releaseNotes: >-
-  Update the self-hosted OpenBot engine to 0.52.0. Tasks migrate to Threads; rollback requires restoring the full pre-upgrade app data.
+  Update the self-hosted OpenBot engine to 0.52.1. Tasks migrate to Threads; rollback requires restoring the full pre-upgrade app data.
   Preserve V3 Codex Workspace-only AppArmor and Seccomp enforcement, the existing
   local /data folder, and the Umbrel dock redirect. Review backups before update.
 developer: Nightly Labs
