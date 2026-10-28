@@ -53,17 +53,21 @@ On 27 October 2026 a fresh pre-0.52 stopped-app copy was placed on a separate ex
 
 The external HDD also contains four older OpenBot backup generations. These are **retention candidates, not automatically trash**: confirm independent recovery, age/version, and restoration capability before approving any deletion. Do not remove external snapshots, app workspaces, provider auth, logs, fonts, or caches based on filenames alone. No external-photo library is part of this OpenBot cleanup.
 
+**Owner's retention target (policy only; not yet enforced): one verified, current-version complete backup during normal operation.** During a production upgrade, keep the prior known-good copy and a separate temporary pre-upgrade/rotation copy if needed. Never overwrite the only verified backup. Once a new current-version backup passes integrity and isolated restoration checks and the upgraded app passes functional checks, retire only explicitly approved older snapshots; do not delete by age or merely because Umbrel shows `ready`. The pre-0.52 rollback checkpoint must remain until a verified current-version recovery plan is accepted. No automatic pruning is currently deployed.
+
 The old `tools/openbot_upgrade_backup.py` is a **0.49-to-0.50 legacy backup helper**. Its preflight intentionally requires the old 0.49 package and will reject the live 0.52 installation. Do **not** present it as the current backup solution. Retain the script and tests for historical recovery evidence until a reviewed replacement exists.
+
+A new staged backup tool is provided at `tools/openbot_backup_current.py` with synthetic tests in `tools/test_openbot_backup_current.py`. It can preflight, make a **stopped-app** checksum-verified full app-tree copy, verify a copy, and rehearse a disposable **file-level** restore. It has **no delete/prune command** and has not yet run on Mochilab. Read `docs/SAFE-UPDATER.md` before running any host command. A file-level test is not a full-app restore test.
 
 ## Update workflow
 
 1. Inspect the actual installed version, upstream Stable release, app-store manifest, current image and security/volume settings.
 2. Review release notes for database migrations, permission changes and provider behavior. Retain a rollback strategy for **both** code and data.
-3. Stop the app and make a protected independent complete backup. Verify what was actually copied; distinguish file listing/sizes from checksums or an isolated full restore.
+3. Verify a usable, current-version pre-upgrade rollback copy. If the existing retained backup is stale, incomplete, or cannot cover a migration, stop OpenBot and create a separate protected temporary copy. Verify contents before upgrading; never overwrite the sole known-good backup. Release-watch checks do not create backups.
 4. Propose only the pinned engine image and Umbrel version changes in a reviewed GitHub PR. Review CI and unchanged security artifacts. The automated release watcher creates **Draft PRs only**; it never deploys.
 5. After publishing the reviewed store change, wait for Umbrel to refresh the community registry. Then update using Umbrel's app updater; do not manually edit the running app's Compose or downgrade its database.
 6. Inspect app version and actual image, logs, provider startup, data preservation, Agent/Thread/UI functionality, and original AppArmor/Seccomp controls. `ready` alone is insufficient.
-7. Keep the previous data snapshot until functional checks and a recovery plan pass. Full rollback requires stopping the app and restoring the matching older data/config snapshot; it may discard newer conversations and requires separate approval.
+7. Keep the pre-upgrade rollback copy until actual application tests and recovery checks pass. Return to one retained, verified, current-version backup only after separate explicit approval to prune named older generations. Full rollback requires the matching older data/config snapshot and may discard newer conversations.
 
 See [Safe update / recovery runbook](docs/SAFE-UPDATER.md) for current checkpoints and limitations.
 
