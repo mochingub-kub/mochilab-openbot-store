@@ -1,0 +1,37 @@
+version: "3.7"
+services:
+  app_proxy:
+    environment:
+      APP_HOST: mochilab-openbot_landing_1
+      APP_PORT: 8080
+
+  landing:
+    image: ghcr.io/nginx/nginx-unprivileged:1.30.6-alpine@sha256:c8ce7718f0270acba1aecc2f3c8cb5cc8fed42b538c9bc9f2c389ca7c27fb42c
+    restart: on-failure
+    user: "101:101"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m
+    volumes:
+      - ${APP_DATA_DIR}/landing:/usr/share/nginx/html:ro
+
+  openbot:
+    image: ghcr.io/nightly-labs/openbot:0.49.0
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - seccomp=${APP_DATA_DIR}/seccomp-workspace.json
+      - apparmor=mochilab-openbot-workspace
+      - no-new-privileges:true
+    shm_size: 1g
+    stop_grace_period: 60s
+    mem_limit: 6g
+    cpus: "4.0"
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    # Scoped AppArmor permits tested Codex/Bubblewrap mount roots in user namespaces.
