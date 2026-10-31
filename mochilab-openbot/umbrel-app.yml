@@ -5,7 +5,7 @@ storage:
 category: ai
 name: OpenBot
 tagline: Persistent AI teammates on your Umbrel
-version: "0.54.0-1"
+version: "0.56.0-1"
 description: >-
   Run the official OpenBot Docker server on your own umbrelOS device.
   OpenBot works in the background and you connect through the OpenBot web or desktop client.
