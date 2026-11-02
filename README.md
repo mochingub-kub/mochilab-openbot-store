@@ -63,6 +63,10 @@ For generic precautions, see [Safe updates and recovery](docs/SAFE-UPDATER.md). 
 - Issues and pull requests may go unanswered or be closed without a fix. Please do not expect personal troubleshooting.
 - **You install and run it entirely at your own risk.** The package is provided **as is, without warranty**. To the extent permitted by applicable law, I accept no liability for data loss, downtime, failed updates, security incidents, incompatibility, or other harm arising from its use.
 
+**Upstream license:** OpenBot's upstream repository currently publishes the [PolyForm Noncommercial License 1.0.0](https://github.com/nightly-labs/openbot/blob/main/LICENSE). Installing through a community store does not grant additional commercial-use rights. Review upstream terms before using OpenBot, especially for business or commercial work.
+
+For sensitive reports, see [Security and privacy](SECURITY.md).
+
 This repository is **not affiliated with or endorsed by Nightly Labs or Umbrel**. Please do not send issues caused by *this community packaging* to Nightly Labs as if it were an officially supported integration. For the upstream OpenBot software itself, use its [official documentation and repository](https://github.com/nightly-labs/openbot).
 
 ## Credits

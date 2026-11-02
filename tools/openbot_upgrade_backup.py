@@ -19,7 +19,10 @@ import tempfile
 import time
 
 APP = Path("/home/umbrel/umbrel/app-data/mochilab-openbot")
-PARENT = Path("/home/umbrel/umbrel/external/mochi-external")
+# Legacy-only opt-in backup root. Never default to the maintainer's disk.
+# The 0.49-to-0.50 version guard still rejects newer installations.
+PARENT = Path(os.environ.get("OPENBOT_LEGACY_BACKUP_ROOT",
+                             "/nonexistent/openbot-legacy-backup-root-not-configured"))
 PROJECT = "mochilab-openbot"
 SCHEMA = "mochilab-openbot-0.50-preupgrade-file-backup-v1"
 PREFIX = ".mochilab-openbot-pre050-"
