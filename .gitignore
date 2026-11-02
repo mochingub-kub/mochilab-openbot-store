@@ -1,0 +1,29 @@
+# Never publish local application state, credentials, or recovery copies.
+# Keep the tracked Umbrel package placeholder: mochilab-openbot/data/.gitkeep
+**/.env
+**/.env.*
+!**/.env.example
+**/*secret*
+**/*credential*
+**/*token*
+**/*keyring*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa*
+**/id_ed25519*
+**/openbot.db*
+**/*.sqlite
+**/*.sqlite3
+**/*.db-wal
+**/*.db-shm
+**/session*
+**/cookies*
+**/backup/
+**/backups/
+**/snapshots/
+**/*.bak
+**/*.backup
+mochilab-openbot/data/**
+!mochilab-openbot/data/.gitkeep
