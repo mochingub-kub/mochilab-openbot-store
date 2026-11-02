@@ -1,73 +1,70 @@
 # Mochilab OpenBot Community App Store
 
-An unofficial [umbrelOS](https://umbrel.com/) Community App Store package for [Nightly Labs OpenBot](https://openbot.run/).
+An **unofficial Community App Store package** for running [Nightly Labs OpenBot](https://openbot.run/) on [umbrelOS](https://umbrel.com/).
 
-I made this for my own home server, and I'm sharing it in case it's useful to anyone else running umbrelOS. You can add this repository as a Community App Store instead of building your own Umbrel app package.
+> **Personal project · no support · use at your own risk.**
+> I built this package for my own home server and made the repository public so other umbrelOS users can install it. **This is not a maintained service or an officially supported app.**
 
-> **Personal project · shared as-is.** This is not an official Umbrel or Nightly Labs app store. I made it for my own setup, not as a supported product. **Use it at your own risk.**
+**Before installing:** I do not promise updates, fixes, troubleshooting, compatibility testing, or responses to issues and pull requests. I may stop maintaining this repository at any time. You are responsible for your installation, security, and backups. See [Support and liability](#support-and-liability).
 
 ## Install on umbrelOS
 
-1. In umbrelOS, go to **App Store → Community App Stores**.
-2. Add this GitHub repository as a community store:
-   
+1. Open **App Store → Community App Stores** in umbrelOS.
+2. Add this repository:
+
    `https://github.com/mochingub-kub/mochilab-openbot-store`
-3. Open the **Mochilab** store and install **OpenBot**.
-4. For the **first-time login**, connect to the **umbrelOS host via SSH** (not a Portainer container) and run:
+
+3. Open the **Mochilab** community store and install **OpenBot**.
+4. For the first-time engine login, connect to the **umbrelOS host via SSH** (not a Portainer container) and run:
 
    ```sh
    sudo docker exec -it mochilab-openbot_openbot_1 openbot login
    ```
 
-5. Complete the email / one-time-code login privately. Open the OpenBot icon in the Umbrel dashboard; it redirects to [OpenBot Web App](https://openbot.run/app). Sign in with the same account and select your self-hosted server.
+5. Complete the email / one-time-code sign-in privately. Open the OpenBot app icon in umbrelOS; it redirects to [the official OpenBot Web App](https://openbot.run/app). Sign in to the web client and select your self-hosted server.
 
-**Important:** This is **not** a completely one-click or fully offline setup. The OpenBot engine runs on your Umbrel machine, but the dashboard icon opens the upstream web client. First-time authentication still requires SSH. This store does not install Ollama or configure AI providers for you.
+**Not one-click or fully offline:** The engine runs on your umbrelOS device, but the app icon opens the upstream web client. Initial engine authentication requires SSH. This package does not install Ollama or configure AI providers.
 
-## Current package
+## What the package does
 
-| Item | Version / configuration |
-| --- | --- |
-| Community store | `Mochilab` |
-| Umbrel app ID | `mochilab-openbot` |
-| Umbrel package | `0.58.0-1` |
-| OpenBot engine | `ghcr.io/nightly-labs/openbot:0.58.0` |
-| Persistent data | Umbrel-managed app data mounted as `/data` |
-| OpenBot host port | Not published |
-| Launcher | Redirects to `https://openbot.run/app` |
+- Runs the upstream, version-pinned OpenBot Docker engine rather than a modified fork.
+- Stores persistent OpenBot data in Umbrel-managed app storage mounted as `/data`.
+- Uses the Umbrel app proxy and a minimal launcher redirect. The OpenBot engine itself does not publish a host port.
+- Preserves the packaged AppArmor, Seccomp, and `no-new-privileges` settings. It does not mount the host Docker socket or unrelated host directories.
 
-**Status checked November 2, 2026:** `0.58.0-1` was installed and reported `ready` on my own umbrelOS machine. That does **not** mean every agent, provider, feature, or clean installation on other hardware has been tested.
+Check the [current app manifest](mochilab-openbot/umbrel-app.yml) and [Docker Compose configuration](mochilab-openbot/docker-compose.yml) for the actual version and permissions. The files in the repository, not a dated README claim, define the package.
 
-For the actual package version, check [the Umbrel manifest](mochilab-openbot/umbrel-app.yml) and [Docker Compose file](mochilab-openbot/docker-compose.yml). This dated README snapshot may become outdated.
+## Compatibility and security
 
-## Compatibility and limitations
+This package was made for **one personal umbrelOS setup**. It has **not** been certified or broadly tested on other hardware, operating-system versions, kernels, or configurations.
 
-- Built and tested for **my personal umbrelOS setup**. Other hardware, OS versions, and configurations are **not guaranteed** to work.
-- The package uses Umbrel pre-start hooks and custom **AppArmor / Seccomp** security profiles. Hosts without the expected kernel features and tooling may fail to start it.
-- OpenBot may execute commands and modify files within its container. The configured security controls reduce privileges, but they are **not a guarantee of isolation or safety**.
-- The container uses only its own app-data mount; it does not publish an OpenBot host port, run privileged, or mount the host Docker socket. Please review the Compose file and hooks before installing.
-- The app's persistent data may contain provider sessions, local tools, agent files, encryption-related files, and other sensitive material. Keep backups private.
-
-## Maintenance, support, and responsibility
-
-**I maintain this repository only when I have spare time.** It was created for personal use, and I don't promise regular updates, quick fixes, compatibility testing, or technical support. Upstream OpenBot releases may arrive long before this package is updated, and I may stop maintaining it at any time.
-
-You're welcome to try it and share feedback or open an issue, but **I cannot guarantee a reply or a fix**. Please don't rely on this repository for production-critical use.
-
-**Provided as-is, without warranty.** You are responsible for checking compatibility, securing your server, and backing up your data. I do not assume responsibility for failed installations, downtime, security problems, lost data, or damage resulting from using this unofficial package.
+- Its startup hooks require particular AppArmor / Seccomp support. Installation or startup may fail on other devices.
+- OpenBot agents can execute commands and modify files within their container. Container restrictions reduce some risks but **do not guarantee complete isolation**.
+- Persistent app data can contain login sessions, encryption-related material, agent files, and other secrets. **Never upload app-data folders, backups, authentication tokens, or unredacted logs to a public issue or repository.**
+- Do not expose admin interfaces, SSH, or container management ports to the public internet just to make this app work.
+- A reported status of `ready` is not proof that your providers, agents, login, or backups work.
 
 ## Backups and updates
 
-- **Back up the entire Umbrel app data and configuration before upgrading**, not just `openbot.db`. This includes workspaces, keyrings, login/session state, and the other files needed to restore it.
-- Updates can introduce database migrations. **Downgrading only the Docker image may not be a valid rollback**; restoring matching older app data may be required and can discard newer changes.
-- Images are version-pinned rather than using `latest`. The release watcher may prepare **draft pull requests**, but it does not automatically release or deploy updates.
-- A `ready` app status is not a substitute for testing login, agents, providers, data preservation, and recovery.
+**Back up the complete app data and configuration before installing an update**, including workspaces, database, keyrings, and sessions. A copy of `openbot.db` by itself is not a complete recovery backup.
 
-For detailed, **owner-specific** historical update and recovery notes, see [SAFE-UPDATER.md](docs/SAFE-UPDATER.md). Parts of that document describe older releases and should not be treated as universal installation instructions.
+Upstream releases can change the database schema. **Downgrading only a Docker image may not restore a previous working state**; you may need matching older app data as well. Test recovery independently before trusting a backup.
 
-## Credits and scope
+The GitHub release watcher may propose **draft pull requests** for newer upstream versions, but it **does not automatically merge, install, deploy, or back up** your app.
 
-[OpenBot](https://github.com/nightly-labs/openbot) is developed by **Nightly Labs**. This repository is simply my personal Umbrel packaging; it is **not affiliated with or endorsed by** Nightly Labs or the Umbrel team.
+For generic precautions, see [Safe updates and recovery](docs/SAFE-UPDATER.md). That document is a public guide, **not a report about the current state of anyone's server**.
 
-This store is for Nightly Labs OpenBot, **not** the unrelated CopilotKit project with a similar name.
+## Support and liability
 
-If you give it a try on your own Umbrel machine, I hope it helps. Just keep in mind that this is a hobby project, not a maintained product.
+**There is no support commitment for this community package.**
+
+- I maintain it only when I choose to and have spare time. There is **no guaranteed release schedule or compatibility testing**.
+- I am **not offering technical support, installation assistance, debugging, or bug fixes** for other people's servers.
+- Issues and pull requests may go unanswered or be closed without a fix. Please do not expect personal troubleshooting.
+- **You install and run it entirely at your own risk.** The package is provided **as is, without warranty**. To the extent permitted by applicable law, I accept no liability for data loss, downtime, failed updates, security incidents, incompatibility, or other harm arising from its use.
+
+This repository is **not affiliated with or endorsed by Nightly Labs or Umbrel**. Please do not send issues caused by *this community packaging* to Nightly Labs as if it were an officially supported integration. For the upstream OpenBot software itself, use its [official documentation and repository](https://github.com/nightly-labs/openbot).
+
+## Credits
+
+[OpenBot](https://github.com/nightly-labs/openbot) is developed by **Nightly Labs**. This repository only provides an unofficial umbrelOS package. It is **not** the unrelated CopilotKit project with a similar name.
