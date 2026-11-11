@@ -5,7 +5,7 @@ storage:
 category: ai
 name: OpenBot
 tagline: Persistent AI teammates on your Umbrel
-version: "0.67.1-1"
+version: "0.68.0-1"
 description: >-
   Run the official OpenBot Docker server on your own umbrelOS device.
   OpenBot works in the background and you connect through the OpenBot web or desktop client.
@@ -22,7 +22,7 @@ description: >-
   data directory, does not mount the host Docker socket, and publishes no OpenBot port.
   Back up the complete app data folder before upgrades. This is an unofficial personal-use\n  community package provided as-is, without warranty, maintenance or technical support.\n  Use at your own risk. The package author does not troubleshoot or fix third-party installations.
 releaseNotes: >-
-  Update the self-hosted OpenBot engine to 0.67.1. Fixes agent Delete history, chat queue disk growth, Codex and MCP errors; improves browser tools, remote-server chat, Gemini and routines. Rollback may require restoring the matching pre-upgrade app data.
+  Update the self-hosted OpenBot engine to 0.68.0. Improves fallback models when Claude reaches limits or fails, fixes browser hangs and session recovery, preserves Codex context, and adds MCP and Webhook reliability. Rollback may require restoring the matching pre-upgrade app data.
   Preserve V3 Codex Workspace-only AppArmor and Seccomp enforcement, the existing
   local /data folder, and the Umbrel dock redirect. Review backups before update.
 developer: Nightly Labs
