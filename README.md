@@ -52,7 +52,7 @@ Upstream releases can change the database schema. **Downgrading only a Docker im
 
 The GitHub release watcher may propose **draft pull requests** for newer upstream versions, but it **does not automatically merge, install, deploy, or back up** your app.
 
-For generic precautions, see [Safe updates and recovery](docs/SAFE-UPDATER.md). That document is a public guide, **not a report about the current state of anyone's server**.
+For generic precautions, see [Safe updates and recovery](docs/SAFE-UPDATER.md). Maintainers can use the [public release checklist](docs/RELEASE-CHECKLIST.md) to review each upgrade and its separate backup/retention gates. These documents are public guides, **not reports about the current state of anyone's server**.
 
 ## Support and liability
 
