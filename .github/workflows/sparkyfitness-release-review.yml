@@ -1,0 +1,70 @@
+name: Prepare a SparkyFitness release review
+
+# OpenBot owns recurring schedules. This workflow runs only when explicitly dispatched.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sparkyfitness-release-review
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install 'PyYAML==6.0.3'
+      - name: Prepare stable images only; preserve database and infrastructure
+        id: candidate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python tools/sparkyfitness_release_plan.py --prepare-latest | tee "$RUNNER_TEMP/sparky-result"
+          if grep -Fxq 'RESULT=REVIEW_CANDIDATE_PREPARED' "$RUNNER_TEMP/sparky-result"; then
+            version="$(sed -n 's/^REVIEW_TARGET_VERSION=//p' "$RUNNER_TEMP/sparky-result")"
+            [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check the candidate
+        if: steps.candidate.outputs.changed == 'true'
+        run: |
+          python -m unittest discover -s tools -p 'test_sparkyfitness*.py' -v
+          git diff --check
+      - name: Open one draft PR; do not merge or install
+        if: steps.candidate.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          set -euo pipefail
+          branch="release/sparkyfitness-$VERSION-review"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo 'Review branch exists; no overwrite.'
+            exit 0
+          fi
+          actual="$(git diff --name-only)"
+          expected="$(printf 'mochilab-sparkyfitness/docker-compose.yml\nmochilab-sparkyfitness/umbrel-app.yml')"
+          [[ "$actual" == "$expected" ]]
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add mochilab-sparkyfitness/docker-compose.yml mochilab-sparkyfitness/umbrel-app.yml
+          git commit -m "chore(sparkyfitness): propose $VERSION for review" \
+            -m "Co-authored-by: OpenBot <335604065+openbotgit[bot]@users.noreply.github.com>"
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title "Review SparkyFitness $VERSION" \
+            --body 'Stable-release candidate. PostgreSQL, secrets, mounts, proxy and app ID are unchanged. Review upstream migrations and release notes. Run package checks and a disposable database/restore smoke test before approval. A PR made with GITHUB_TOKEN does not trigger pull_request workflows: run SparkyFitness package checks manually on this branch. No automatic merge, installation or host action.'
