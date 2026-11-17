@@ -1,0 +1,61 @@
+name: SparkyFitness package checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mochilab-sparkyfitness/**'
+      - 'tools/*sparkyfitness*'
+      - 'tools/vendor/sparkyfitness/**'
+      - 'tools/fixtures/sparkyfitness-app-gateway-config.yml'
+      - '.github/workflows/sparkyfitness-package-guard.yml'
+      - '.github/workflows/sparkyfitness-release-review.yml'
+  pull_request:
+    paths:
+      - 'mochilab-sparkyfitness/**'
+      - 'tools/*sparkyfitness*'
+      - 'tools/vendor/sparkyfitness/**'
+      - 'tools/fixtures/sparkyfitness-app-gateway-config.yml'
+      - '.github/workflows/sparkyfitness-package-guard.yml'
+      - '.github/workflows/sparkyfitness-release-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install 'PyYAML==6.0.3'
+      - run: python -m unittest discover -s tools -p 'test_sparkyfitness*.py' -v
+      - run: bash -n mochilab-sparkyfitness/exports.sh
+      - name: Read-only Compose validation with synthetic values
+        env:
+          APP_DATA_DIR: /tmp/sparkyfitness-config-test
+          DEVICE_DOMAIN_NAME: umbrel.local
+          APP_PROXY_PORT: '3019'
+          APP_MOCHILAB_SPARKYFITNESS_DB_PASSWORD: synthetic
+          APP_MOCHILAB_SPARKYFITNESS_APP_DB_PASSWORD: synthetic
+          APP_MOCHILAB_SPARKYFITNESS_API_ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          APP_MOCHILAB_SPARKYFITNESS_BETTER_AUTH_SECRET: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          APP_MOCHILAB_SPARKYFITNESS_TOR_ORIGIN: ''
+        # Render only. The native Umbrel gateway placeholder is never started.
+        run: docker compose -f mochilab-sparkyfitness/docker-compose.yml -f tools/fixtures/sparkyfitness-app-gateway-config.yml config --quiet
+      - uses: actions/checkout@v4
+        with:
+          repository: getumbrel/umbrel-apps
+          ref: 067355c29a3846b5261e6d5fde8c1e956e98551b
+          path: .lint-store
+          persist-credentials: false
+      - name: Official lint and published amd64/arm64 digest checks
+        run: |
+          npm ci --prefix .lint-store --ignore-scripts --no-audit --no-fund
+          node .lint-store/.tools/lint-apps.mjs mochilab-sparkyfitness --root "$GITHUB_WORKSPACE" --check-images

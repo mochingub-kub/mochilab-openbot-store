@@ -1,0 +1,13 @@
+{
+  "upstream": "https://github.com/CodeWithCJ/SparkyFitness",
+  "package_commit": "324d48d5c8835d4726d5e22c16fcbe3b9298bc48",
+  "app_version": "v1.12.1",
+  "app_commit": "39d9ca2d13c2a1b9f64e4be793b2f23433489d0c",
+  "store_base": "1d46a25c3397d5df6508bdbf5db15b58957d1c85",
+  "changes": [
+    "Namespace app ID, container names and export variables for Mochilab",
+    "Declare storage.dataRoot=data",
+    "Set community submitter and icon; retain upstream package submission as attribution",
+    "Keep all runtime image pins and upstream service settings unchanged"
+  ]
+}

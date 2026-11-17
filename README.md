@@ -27,6 +27,15 @@ An **unofficial Community App Store package** for running [Nightly Labs OpenBot]
 
 ## What the package does
 
+### SparkyFitness
+
+This store also packages [SparkyFitness](https://github.com/CodeWithCJ/SparkyFitness)
+as `mochilab-sparkyfitness`. See [package, backup and update notes](docs/SPARKYFITNESS.md).
+The same personal-project support limits apply. SparkyFitness has its own
+[non-commercial license](mochilab-sparkyfitness/LICENSE).
+
+### OpenBot
+
 - Runs the upstream, version-pinned OpenBot Docker engine rather than a modified fork.
 - Stores persistent OpenBot data in Umbrel-managed app storage mounted as `/data`.
 - Uses the Umbrel app proxy and a minimal launcher redirect. The OpenBot engine itself does not publish a host port.

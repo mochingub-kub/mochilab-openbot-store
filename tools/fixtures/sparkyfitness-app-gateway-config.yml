@@ -1,0 +1,6 @@
+# Read-only configuration overlay from umbrelOS 2.0.0, commit 9298257b0e904ca8d8270b1702672666343f0b86.
+# Source: packages/umbreld/source/modules/apps/legacy-compat/docker-compose.app_gateway.yml
+# Umbrel uses this image placeholder for configuration rendering only. Never run it.
+services:
+  app_proxy:
+    image: app-proxy-config-only
