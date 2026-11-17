@@ -57,7 +57,8 @@ This design does not make downgrades safe.
 
 The current backup code exports a logical database dump and uploads.
 The release backend contains PostgreSQL 18 client tools.
-These source checks are not a completed backup or restore test.
+The isolated acceptance test below also exercises the real application backup and restore endpoints.
+This proves recovery of synthetic data with preserved test secrets, not recovery of an owner's Umbrel seed.
 
 Before each installed-app upgrade:
 
@@ -122,28 +123,40 @@ It opens a draft PR and never merges or installs.
 The repository must permit GitHub Actions to create PRs.
 PRs made with `GITHUB_TOKEN` do not trigger ordinary PR checks.
 Manually run **SparkyFitness package checks** on the generated branch before review.
-This checks configuration and images; it does not run containers or prove a restore.
+The checks include disposable containers, API login, restart persistence and synthetic backup/restore.
+They do not install the app on the owner's Umbrel.
 
 Recurring release checks must be an owner-approved OpenBot routine.
 No GitHub cron, OpenBot routine or automatic merge is enabled by this candidate.
 A suitable routine checks the wrapper's read-only result and reports a new stable version to the owner.
 Creating a draft PR, merging and updating the host remain separate actions.
 
-## Validation and next gate
+## Validation and release gate
 
 Local checks cover package invariants, deterministic synthetic exports, candidate safety, Compose rendering and published image digests.
 The official Umbrel linter is pinned to `067355c29a3846b5261e6d5fde8c1e956e98551b`.
 The Compose fixture is the configuration-only gateway overlay from umbrelOS 2.0.0.
 It is never a runtime proxy image.
 
-Before merge, use a disposable Docker/Umbrel environment to test:
+On 2026-11-17, the [isolated GitHub Actions acceptance run](https://github.com/mochingub-kub/mochilab-openbot-store/actions/runs/44040573471)
+passed with the published v1.12.1 images:
 
-1. Fresh PG18 initialization, all application migrations and backend readiness.
-2. Browser sign-in through the native gateway and persistence after a restart.
-3. A logical backup and restoration of a synthetic account and upload.
-4. Stable secrets and successful sign-in after a candidate update.
-5. Port availability, mobile TLS and optional integrations required by the owner.
+1. Fresh PostgreSQL 18 startup, 305 application migrations and backend readiness.
+2. First-account administrator creation and password sign-in through the packaged frontend's HTTP API.
+3. The application's logical database and upload backup, downloaded through its authenticated endpoint.
+4. In-place restoration after changing a database marker and an upload; both original values returned.
+5. Restart persistence, successful sign-in and the same migration count after all application containers restarted.
+6. Restoration into a second fresh instance using the same synthetic secrets; the original account and upload returned.
 
-The preparation environment has no Docker engine.
-No application startup, migration execution, restart, live backup or restore has been performed.
-The package is a review candidate until these runtime checks pass.
+Both instances used separate temporary data directories and networks on an ephemeral amd64 runner.
+The acceptance script runs only in GitHub Actions and cleans only its own test containers and data.
+The downloaded evidence artifact reports six passes and no cleanup errors.
+The owner host, existing applications and Denny data were not changed.
+
+Remaining first-install checks are the native Umbrel gateway/browser UI and actual host directory ownership.
+Mobile TLS, Tor and Garmin need checks if those features are required.
+A native Umbrel seed restore and Denny PG15 migration remain separate, untested operations.
+A later application version must pass this acceptance job before release review.
+
+Merge and installation need explicit approval for PR #32 and app `mochilab-sparkyfitness` on the target Umbrel.
+The package preparation and isolated acceptance work do not grant that approval.
