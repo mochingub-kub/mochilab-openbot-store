@@ -20,7 +20,7 @@ services:
       - ${APP_DATA_DIR}/landing:/usr/share/nginx/html:ro
 
   openbot:
-    image: ghcr.io/nightly-labs/openbot:0.77.0
+    image: ghcr.io/nightly-labs/openbot:0.77.0@sha256:4db3793f25d42c1163369cfbf497481ea52a735ff0f9bd9b5b751119a8b68d8f
     restart: unless-stopped
     security_opt:
       - seccomp=${APP_DATA_DIR}/seccomp-workspace.json
