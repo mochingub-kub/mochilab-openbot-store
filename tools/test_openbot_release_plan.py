@@ -31,16 +31,36 @@ class SafeUpdater(unittest.TestCase):
     def test_build_next_version_edits_only_image_manifest_and_note(self):
         before = (self.root / up.IMAGE_FILE).read_text()
         hook = (self.root / "mochilab-openbot/hooks/pre-start").read_bytes()
-        self.assertTrue(up.propose(self.root, "999.999.999"))
+        digest = "sha256:" + "a" * 64
+        with mock.patch.object(up, "image_digest", return_value=digest) as lookup:
+            self.assertTrue(up.propose(self.root, "999.999.999"))
+        lookup.assert_called_once_with("999.999.999")
         self.assertEqual(up.current(self.root), "999.999.999")
         after = (self.root / up.IMAGE_FILE).read_text()
-        self.assertEqual(after.replace("openbot:999.999.999", "openbot:" + self.initial_version), before)
+        replacement = f"    image: ghcr.io/nightly-labs/openbot:999.999.999@{digest}"
+        previous = up.IMAGE.search(before).group()
+        self.assertEqual(after, before.replace(previous, replacement))
         m = (self.root / up.MANIFEST_FILE).read_text()
         self.assertIn('version: "999.999.999-1"', m)
         self.assertIn("engine to 999.999.999", m)
         self.assertEqual(hook, (self.root / "mochilab-openbot/hooks/pre-start").read_bytes())
         self.assertEqual(list(self.root.rglob("*.apparmor"))[0].read_bytes(),
                          (up.ROOT / "mochilab-openbot/hooks/mochilab-openbot-workspace.apparmor").read_bytes())
+
+    def test_missing_digest_rejected(self):
+        compose = self.root / up.IMAGE_FILE
+        compose.write_text(up.IMAGE.sub(r"    image: ghcr.io/nightly-labs/openbot:\1",
+                                       compose.read_text()))
+        with self.assertRaisesRegex(up.Blocked, "PINNED_IMAGE_NOT_EXACTLY_ONE"):
+            up.current(self.root)
+
+    def test_registry_failure_leaves_package_untouched(self):
+        paths = [self.root / up.IMAGE_FILE, self.root / up.MANIFEST_FILE]
+        before = [path.read_bytes() for path in paths]
+        with mock.patch.object(up, "image_digest", side_effect=up.Blocked("GHCR_DIGEST_MISMATCH")):
+            with self.assertRaisesRegex(up.Blocked, "GHCR_DIGEST_MISMATCH"):
+                up.propose(self.root, "999.999.999")
+        self.assertEqual([path.read_bytes() for path in paths], before)
 
     def test_same_or_older_release_does_not_downgrade(self):
         compose = (self.root / up.IMAGE_FILE).read_bytes()

@@ -20,7 +20,11 @@ UPSTREAM_SC = "6e42d0bd8e904f5ddddaf3c6c7c50f1dc2d72418"
 WORKSPACE_AA = "afd0d87e7a09e39afad12864fb988586ce95104e"
 WORKSPACE_SC = "4fa610c6303f4610844dc6ae0da5546030a77cbb"
 API = "https://api.github.com/repos/nightly-labs/openbot"
-IMAGE = re.compile(r"(?m)^    image: ghcr\.io/nightly-labs/openbot:(\d+\.\d+\.\d+)$")
+GHCR = "https://ghcr.io"
+IMAGE_REPO = "nightly-labs/openbot"
+IMAGE = re.compile(
+    rf"(?m)^    image: ghcr\.io/{IMAGE_REPO}:(\d+\.\d+\.\d+)@(sha256:[0-9a-f]{{64}})$"
+)
 PACKAGE = re.compile(r'(?m)^version: "(\d+\.\d+\.\d+)-([1-9]\d*)"$')
 RELEASE_NOTE = re.compile(r"(?m)^  Update the self-hosted OpenBot engine to (\d+\.\d+\.\d+)\b")
 VERSION = re.compile(r"\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\Z")
@@ -54,7 +58,7 @@ def current(root=ROOT):
     root = Path(root)
     compose = (root / IMAGE_FILE).read_text(encoding="utf-8")
     manifest = (root / MANIFEST_FILE).read_text(encoding="utf-8")
-    version = one(IMAGE, compose, "IMAGE_TAG_NOT_EXACTLY_ONE").group(1)
+    version = one(IMAGE, compose, "PINNED_IMAGE_NOT_EXACTLY_ONE").group(1)
     package = one(PACKAGE, manifest, "PACKAGE_VERSION_NOT_EXACTLY_ONE")
     note = one(RELEASE_NOTE, manifest, "RELEASE_NOTES_VERSION_MISSING")
     need(version == package.group(1) == note.group(1), "PACKAGE_IMAGE_VERSION_DRIFT")
@@ -116,6 +120,26 @@ def stable():
     return version
 
 
+def image_digest(reference):
+    token_url = GHCR + "/token?service=ghcr.io&scope=repository:" + IMAGE_REPO + ":pull"
+    with urlopen(token_url, timeout=15) as response:
+        token = json.load(response)["token"]
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": ("application/vnd.oci.image.index.v1+json, "
+                   "application/vnd.docker.distribution.manifest.list.v2+json"),
+    }
+    url = GHCR + "/v2/" + IMAGE_REPO + "/manifests/" + reference
+    with urlopen(Request(url, headers=headers), timeout=15) as response:
+        raw = response.read()
+        digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+        need(digest == response.headers.get("Docker-Content-Digest"), "GHCR_DIGEST_MISMATCH")
+    platforms = [item.get("platform", {}) for item in json.loads(raw).get("manifests", [])]
+    need(any(p.get("os") == "linux" and p.get("architecture") == "amd64"
+             for p in platforms), "GHCR_LINUX_AMD64_MISSING")
+    return digest
+
+
 def propose(root, target):
     root = Path(root)
     installed = current(root)
@@ -124,14 +148,17 @@ def propose(root, target):
     cpath, mpath = root / IMAGE_FILE, root / MANIFEST_FILE
     compose, manifest = cpath.read_text(), mpath.read_text()
     pkg_rev = one(PACKAGE, manifest, "PACKAGE_REVISION").group(2)
-    next_compose = IMAGE.sub("    image: ghcr.io/nightly-labs/openbot:" + target, compose)
+    previous_image = one(IMAGE, compose, "PINNED_IMAGE_NOT_EXACTLY_ONE").group()
+    digest = image_digest(target)
+    pinned_image = f"    image: ghcr.io/{IMAGE_REPO}:{target}@{digest}"
+    next_compose = IMAGE.sub(pinned_image, compose)
     next_manifest = PACKAGE.sub('version: "' + target + '-1"', manifest)
     next_manifest = RELEASE_NOTE.sub(
         "  Update the self-hosted OpenBot engine to " + target, next_manifest)
     need(next_compose != compose and next_manifest != manifest,
          "NO_VERSION_CHANGE")
-    # Exactly three version fields may be changed. No security/policy edits.
-    need(next_compose.replace("openbot:" + target, "openbot:" + installed) == compose,
+    # Allow only the OpenBot image, package version and release note lines to change.
+    need(IMAGE.sub(previous_image, next_compose) == compose,
          "COMPOSE_PATCH_TOO_BROAD")
     need(next_manifest.replace('version: "' + target + '-1"',
                                'version: "' + installed + '-' + pkg_rev + '"')
@@ -147,6 +174,7 @@ def main():
     parser = argparse.ArgumentParser()
     options = parser.add_mutually_exclusive_group(required=True)
     options.add_argument("--check-current", action="store_true")
+    options.add_argument("--check-image", action="store_true")
     options.add_argument("--check-latest", action="store_true")
     options.add_argument("--prepare-latest", action="store_true")
     args = parser.parse_args()
@@ -155,6 +183,12 @@ def main():
         if args.check_current:
             print("RESULT=UPDATER_V3_PACKAGE_INTEGRITY_PASS")
             print("PINNED_VERSION=" + present)
+            return 0
+        if args.check_image:
+            compose = (ROOT / IMAGE_FILE).read_text(encoding="utf-8")
+            pinned = one(IMAGE, compose, "PINNED_IMAGE_NOT_EXACTLY_ONE").group(2)
+            need(image_digest(pinned) == pinned, "GHCR_PINNED_DIGEST_MISMATCH")
+            print("GHCR_OPENBOT_PINNED_LINUX_AMD64_IMAGE=PASS")
             return 0
         version = stable()
         print("PINNED_VERSION=" + present)
@@ -169,7 +203,8 @@ def main():
         print("UPSTREAM_SECCOMP_BLOB_UNCHANGED=YES")
         print("V3_WORKSPACE_POLICY_CHANGED=NO")
         print("PRODUCTION_UPDATED=NO")
-        print("GHCR_IMAGE_AVAILABLE=NOT_VERIFIED_BY_SCRIPT")
+        if changed:
+            print("GHCR_IMAGE_AVAILABLE=YES")
         return 0
     except (Blocked, OSError, ValueError, KeyError, TypeError) as error:
         print("BLOCKED=" + (str(error) if isinstance(error, Blocked)

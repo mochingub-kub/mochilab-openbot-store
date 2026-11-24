@@ -51,19 +51,7 @@ jobs:
           python3 tools/openbot_release_plan.py --check-current
           bash -n mochilab-openbot/hooks/pre-start
           test -x mochilab-openbot/hooks/pre-start
-          docker manifest inspect "ghcr.io/nightly-labs/openbot:${{ steps.propose.outputs.version }}" > "$RUNNER_TEMP/image-manifest.json"
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "image-manifest.json").read_text())
-          targets = [
-              m.get("platform", {}) for m in data.get("manifests", [])
-              if isinstance(m, dict)
-          ]
-          assert any(p.get("os") == "linux" and p.get("architecture") == "amd64"
-                     for p in targets), "Missing published linux/amd64 image"
-          print("GHCR_RELEASE_IMAGE_LINUX_AMD64=PASS")
-          PY
+          python3 tools/openbot_release_plan.py --check-image
       - name: Create draft PR only; never merge or deploy
         if: steps.propose.outputs.changed == 'true'
         shell: bash
