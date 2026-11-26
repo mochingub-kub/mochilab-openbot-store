@@ -4,7 +4,7 @@ Runs iApp OpenThai 2.0 FP32 (ASR) and PyThaiNLP MakHam Paradee FP32 + FastThaiG2
 
 1. Install or update **Siang เสียง** from the Mochilab community store. Wait for startup. The first start downloads about 2.60 GB of pinned ASR model artifacts and about 57 MB of pinned TTS and G2P artifacts into `/data/models`. Updating the app reuses the existing verified `/data/models/9f142a4` ASR directory without redownloading the 2.60 GB weights.
 2. In Umbrel, open the app's **App Settings → Default credentials** and copy the password. Use it as the API bearer key. Keep this password private.
-3. If you use a reverse proxy, use HTTPS from the clients, keep the origin port private and allow only `GET /v1/models`, `GET /v1/audio/voices`, `GET /v1/audio/speech/voices`, `POST /v1/audio/transcriptions` and `POST /v1/audio/speech`. The server authenticates all endpoints.
+3. If clients need remote access, follow [Expose the API over HTTPS](#expose-the-api-over-https). The server authenticates every endpoint.
 4. On each OpenBot device, go to **Settings → Voice → Voice server**. Enter your HTTPS base URL ending in `/v1` and the Umbrel password as the API key. Connect, enable **Dictation** (`openthai-2.0-asr-fp32`) and enable **Spoken replies** (`makham-paradee-tts-fp32`, voice `paradee`).
 
 - **Dictation (`POST /v1/audio/transcriptions`):** Accepts a multipart form with `file` (16 kHz mono 16-bit PCM WAV), `model`, optional `response_format=json` and optional `language=th`. Returns `{"text": "..."}`. Accepts up to 120 seconds of recording and 5 MB per request.
@@ -13,17 +13,15 @@ Runs iApp OpenThai 2.0 FP32 (ASR) and PyThaiNLP MakHam Paradee FP32 + FastThaiG2
 
 Stop exposing the API before uninstalling it. Switch OpenBot back to the previous recognizer and speech engine on each device. Uninstalling deletes Umbrel app data, including the downloaded models. The initial Umbrel password is derived from the device and app ID. Reinstalling the same app does not rotate it.
 
-## Cloudflare policy
+## Expose the API over HTTPS
 
-The Cloudflare WAF for `asr.mochingub.com` allows exactly five method and path pairs:
+Use an HTTPS reverse proxy for remote access. Keep the origin port private and add a per-client rate limit suited to your traffic. Configure the proxy to allow only these five method and path pairs:
 
 - `GET /v1/models`
 - `GET /v1/audio/voices`
 - `GET /v1/audio/speech/voices`
 - `POST /v1/audio/transcriptions`
 - `POST /v1/audio/speech`
-
-The host-wide rate limit is 20 requests per 10 seconds per source IP and Cloudflare location, with a 10-second block.
 
 ## Roll back an app release and keep the data
 
