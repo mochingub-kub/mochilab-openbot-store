@@ -38,8 +38,8 @@ Some upload URLs are public to anyone who knows the URL, as described in the ups
 Do not expose the app through a new tunnel or public hostname as part of package installation.
 
 Mobile release builds need trusted HTTPS.
-The upstream guide describes Umbrel's local certificate, but mobile TLS has not been tested on this device.
-LAN HTTP sign-in, mobile TLS, Tor origins and Garmin sync remain runtime checks.
+Use the upstream guide to configure Umbrel's local certificate.
+Verify LAN HTTP sign-in, mobile TLS, Tor origins, and Garmin sync on your installation as needed.
 The umbrelOS 2.0.0 source assigns `APP_HIDDEN_SERVICE` after sourcing app exports.
 The upstream Tor-origin export therefore needs a real Tor test before Tor support is claimed here.
 No Tor setting is changed by this package preparation.
@@ -148,12 +148,10 @@ passed with the published v1.12.1 images:
 Both instances used separate temporary data directories and networks on an ephemeral amd64 runner.
 The acceptance script runs only in GitHub Actions and cleans only its own test containers and data.
 The downloaded evidence artifact reports six passes and no cleanup errors.
-The owner host, existing applications and Denny data were not changed.
 
 Remaining first-install checks are the native Umbrel gateway/browser UI and actual host directory ownership.
 Mobile TLS, Tor and Garmin need checks if those features are required.
 A native Umbrel seed restore and Denny PG15 migration remain separate, untested operations.
 A later application version must pass this acceptance job before release review.
 
-Merge and installation need explicit approval for PR #32 and app `mochilab-sparkyfitness` on the target Umbrel.
-The package preparation and isolated acceptance work do not grant that approval.
+Review the release and verify your backups before updating an existing installation.
