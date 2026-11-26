@@ -1,83 +1,51 @@
-# Mochilab OpenBot Community App Store
+# Mochilab Umbrel Store
 
-An **unofficial Community App Store package** for running [Nightly Labs OpenBot](https://openbot.run/) on [umbrelOS](https://umbrel.com/).
+A community store for [umbrelOS](https://umbrel.com/) with three self-hosted apps for AI teammates, Thai voice, and fitness tracking.
 
-> **Personal project · no support · use at your own risk.**
-> I built this package for my own home server and made the repository public so other umbrelOS users can install it. **This is not a maintained service or an officially supported app.**
+## Apps
 
-**Before installing:** I do not promise updates, fixes, troubleshooting, compatibility testing, or responses to issues and pull requests. I may stop maintaining this repository at any time. You are responsible for your installation, security, and backups. See [Support and liability](#support-and-liability).
+| Icon | App | What it does | Status | Package details |
+| :---: | --- | --- | --- | --- |
+| <img src="https://openbot.run/favicon.ico" width="28" height="28" alt=""> | **OpenBot** | Run the Nightly Labs OpenBot engine on your Umbrel for persistent AI teammates. | Available | [Manifest](mochilab-openbot/umbrel-app.yml) · [Setup](#openbot-setup) · [Safe updates](docs/SAFE-UPDATER.md) |
+| <img src="./mochilab-openthai/icon.svg" width="28" height="28" alt=""> | **Siang เสียง** | Dictate in Thai and hear Thai replies in OpenBot. Speech processing runs on your Umbrel. | Available | [Manifest](mochilab-openthai/umbrel-app.yml) · [Setup and rollback](mochilab-openthai/README.md) |
+| <img src="https://raw.githubusercontent.com/CodeWithCJ/SparkyFitness/324d48d5c8835d4726d5e22c16fcbe3b9298bc48/docs/src/public/logo.png" width="28" height="28" alt=""> | **SparkyFitness** | Track nutrition, exercise, and body metrics on your Umbrel. | Available | [Manifest](mochilab-sparkyfitness/umbrel-app.yml) · [Setup and backups](docs/SPARKYFITNESS.md) |
 
-## Install on umbrelOS
+## Add the store on umbrelOS
 
-1. Open **App Store → Community App Stores** in umbrelOS.
-2. Add this repository:
+1. Open **App Store** from the Umbrel dock. In the top-right menu (**⋯**), choose **Community App Stores**.
+2. Paste `https://github.com/mochingub-kub/mochilab-umbrel-store` and click **Add**.
+3. Click **Open** next to **Mochilab Umbrel Store**, then choose an app and click **Install**.
 
-   `https://github.com/mochingub-kub/mochilab-openbot-store`
+If the new URL is still pending, use the URL of this GitHub repository.
 
-3. Open the **Mochilab** community store and install **OpenBot**.
-4. For the first-time engine login, connect to the **umbrelOS host via SSH** (not a Portainer container) and run:
+[Umbrel's community store guide](https://umbrel.com/support/apps/how-to-add-a-community-app-store) shows the menu and dialog.
 
-   ```sh
-   sudo docker exec -it mochilab-openbot_openbot_1 openbot login
-   ```
+## OpenBot setup
 
-5. Complete the email / one-time-code sign-in privately. Open the OpenBot app icon in umbrelOS; it redirects to [the official OpenBot Web App](https://openbot.run/app). Sign in to the web client and select your self-hosted server.
+On the umbrelOS host, open a private SSH session and run:
 
-**Not one-click or fully offline:** The engine runs on your umbrelOS device, but the app icon opens the upstream web client. Initial engine authentication requires SSH. This package does not install Ollama or configure AI providers.
+```sh
+sudo docker exec -it mochilab-openbot_openbot_1 openbot login
+```
 
-## What the package does
+Complete the email sign-in privately. The Umbrel launcher opens the [OpenBot Web App](https://openbot.run/app). Sign in with the same account and select your self-hosted server. Configure AI providers in OpenBot.
 
-### SparkyFitness
-
-This store also packages [SparkyFitness](https://github.com/CodeWithCJ/SparkyFitness)
-as `mochilab-sparkyfitness`. See [package, backup and update notes](docs/SPARKYFITNESS.md).
-The same personal-project support limits apply. SparkyFitness has its own
-[non-commercial license](mochilab-sparkyfitness/LICENSE).
-
-### OpenBot
-
-- Runs the upstream, version-pinned OpenBot Docker engine rather than a modified fork.
-- Stores persistent OpenBot data in Umbrel-managed app storage mounted as `/data`.
-- Uses the Umbrel app proxy and a minimal launcher redirect. The OpenBot engine itself does not publish a host port.
-- Preserves the packaged AppArmor, Seccomp, and `no-new-privileges` settings. It does not mount the host Docker socket or unrelated host directories.
-
-Check the [current app manifest](mochilab-openbot/umbrel-app.yml) and [Docker Compose configuration](mochilab-openbot/docker-compose.yml) for the actual version and permissions. The files in the repository, not a dated README claim, define the package.
-
-## Compatibility and security
-
-This package was made for **one personal umbrelOS setup**. It has **not** been certified or broadly tested on other hardware, operating-system versions, kernels, or configurations.
-
-- Its startup hooks require particular AppArmor / Seccomp support. Installation or startup may fail on other devices.
-- OpenBot agents can execute commands and modify files within their container. Container restrictions reduce some risks but **do not guarantee complete isolation**.
-- Persistent app data can contain login sessions, encryption-related material, agent files, and other secrets. **Never upload app-data folders, backups, authentication tokens, or unredacted logs to a public issue or repository.**
-- Do not expose admin interfaces, SSH, or container management ports to the public internet just to make this app work.
-- A reported status of `ready` is not proof that your providers, agents, login, or backups work.
+The package runs the pinned upstream engine image with Umbrel-managed app data and includes AppArmor and Seccomp profiles. Review the [Compose configuration](mochilab-openbot/docker-compose.yml) for the runtime settings.
 
 ## Backups and updates
 
-**Back up the complete app data and configuration before installing an update**, including workspaces, database, keyrings, and sessions. A copy of `openbot.db` by itself is not a complete recovery backup.
+Back up the complete app data before updating. OpenBot backups need the database, workspaces, keyrings, and sessions. A database migration may require restoring matching older app data as well as the older image. Test recovery before relying on a backup.
 
-Upstream releases can change the database schema. **Downgrading only a Docker image may not restore a previous working state**; you may need matching older app data as well. Test recovery independently before trusting a backup.
-
-The GitHub release watcher may propose **draft pull requests** for newer upstream versions, but it **does not automatically merge, install, deploy, or back up** your app.
-
-For generic precautions, see [Safe updates and recovery](docs/SAFE-UPDATER.md). That document is a public guide, **not a report about the current state of anyone's server**.
+The release watchers can propose draft PRs. Updates require review and a separate action in Umbrel. See [Safe updates and recovery](docs/SAFE-UPDATER.md) for the OpenBot procedure.
 
 ## Support and liability
 
-**There is no support commitment for this community package.**
+Mochilab is a personal community project. Packages are provided as is, without warranty, guaranteed updates, compatibility testing, or technical support. You are responsible for your installation, data, security, and backups. To the extent permitted by applicable law, the maintainer accepts no liability for data loss, downtime, security incidents, or other harm arising from use.
 
-- I maintain it only when I choose to and have spare time. There is **no guaranteed release schedule or compatibility testing**.
-- I am **not offering technical support, installation assistance, debugging, or bug fixes** for other people's servers.
-- Issues and pull requests may go unanswered or be closed without a fix. Please do not expect personal troubleshooting.
-- **You install and run it entirely at your own risk.** The package is provided **as is, without warranty**. To the extent permitted by applicable law, I accept no liability for data loss, downtime, failed updates, security incidents, incompatibility, or other harm arising from its use.
+Mochilab is an independent packager. Report upstream software issues through the relevant upstream project. See [Security and privacy](SECURITY.md) before reporting a vulnerability or sharing diagnostics. Keep app data, backups, credentials, and unredacted logs private.
 
-**Upstream license:** OpenBot's upstream repository currently publishes the [PolyForm Noncommercial License 1.0.0](https://github.com/nightly-labs/openbot/blob/main/LICENSE). Installing through a community store does not grant additional commercial-use rights. Review upstream terms before using OpenBot, especially for business or commercial work.
+## Licences and credits
 
-For sensitive reports, see [Security and privacy](SECURITY.md).
-
-This repository is **not affiliated with or endorsed by Nightly Labs or Umbrel**. Please do not send issues caused by *this community packaging* to Nightly Labs as if it were an officially supported integration. For the upstream OpenBot software itself, use its [official documentation and repository](https://github.com/nightly-labs/openbot).
-
-## Credits
-
-[OpenBot](https://github.com/nightly-labs/openbot) is developed by **Nightly Labs**. This repository only provides an unofficial umbrelOS package. It is **not** the unrelated CopilotKit project with a similar name.
+- **OpenBot** is developed by Nightly Labs under the [PolyForm Noncommercial License 1.0.0](https://github.com/nightly-labs/openbot/blob/main/LICENSE).
+- **Siang เสียง** uses iApp's OpenThai model under [OpenMDW 1.1](mochilab-openthai/app/LICENSE.OpenThai), plus PyThaiNLP MakHam Paradee and FastThaiG2P under Apache-2.0, with a BSD-3-Clause fallback component. See the [licence and notices](mochilab-openthai/app/LICENSE.FastThaiG2P). The [icon source](mochilab-openthai/icon.svg) includes the Lucide ISC notice.
+- **SparkyFitness** is developed by CodeWithCJ and distributed under its [non-commercial licence](mochilab-sparkyfitness/LICENSE).

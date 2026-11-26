@@ -1,6 +1,6 @@
 # OpenBot on umbrelOS — safe updates and recovery
 
-This is a **general public guide** for the unofficial Mochilab OpenBot Community App Store package. It is not a live status report, a supported upgrade tool, or a record of the maintainer's home server.
+This is a **general public guide** for the unofficial Mochilab OpenBot package. It is not a live status report, a supported upgrade tool, or a record of the maintainer's home server.
 
 **Community package only:** There is no warranty, guaranteed maintenance, troubleshooting service, or compatibility promise. Follow the [README](../README.md) before installing.
 
@@ -36,9 +36,5 @@ Some providers may behave differently inside this container; a security profile 
 If an upgrade causes trouble, determine whether it changed the application image, configuration, or database. A database migration may make an older image incompatible with newer data. Reverting can require **both** a matching older package and an entire matching older app-data backup; doing so may discard conversations or other work created afterward.
 
 Never delete a previous backup simply because the updated app starts. Never attempt a restore against production data without confirming the target, copies, expected data loss, and permissions.
-
-## Legacy helper warning
-
-The checked-in `tools/openbot_upgrade_backup.py` was built for **a specific old 0.49-to-0.50 upgrade** and intentionally rejects other live versions. **It is not a current backup solution and must not be run on a newer production installation.** Existing tests are historical regression tests, not proof of a fully tested restore.
 
 No personal host inventory, backup counts, device paths, or private operational history is required for this public installation guide. For authoritative software releases, consult the [upstream OpenBot repository](https://github.com/nightly-labs/openbot/releases).

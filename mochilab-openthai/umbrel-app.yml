@@ -1,27 +1,28 @@
 manifestVersion: 1.1
 id: mochilab-openthai
-name: OpenThai Dictation
-tagline: Thai speech recognition and spoken replies for OpenBot
+name: Siang เสียง
+tagline: Thai speech-to-text and spoken replies on your Umbrel
 icon: https://raw.githubusercontent.com/mochingub-kub/mochilab-openbot-store/main/mochilab-openthai/icon.svg
 category: ai
-version: "0.2.0"
+version: "0.2.1"
 port: 18081
 storage:
   dataRoot: data
 deterministicPassword: true
 description: >-
-  Run OpenThai 2.0 FP32 speech recognition and MakHam Paradee FP32 Thai speech
-  synthesis on your Umbrel CPU. The OpenAI-compatible voice API uses the Umbrel
-  Credentials password as its bearer key. The app stores checksum-verified model
-  files in app data and reuses the speech recognition model on update. No browser
-  UI is provided.
+  Dictate in Thai and hear Thai spoken replies in OpenBot. Siang runs iApp OpenThai
+  speech recognition and MakHam Paradee speech synthesis on your Umbrel CPU.
+  Speech processing stays on your Umbrel. Connect OpenBot to the OpenAI-compatible
+  Voice server API using the password in Umbrel App Settings. Models are stored
+  in app data and reused across updates. Setup takes place in Umbrel and OpenBot.
 developer: Mochilab
-website: https://huggingface.co/iapp/OpenThai2.0-ASR-Streaming-ONNX
+submitter: Mochilab
+website: https://github.com/mochingub-kub/mochilab-openbot-store/tree/main/mochilab-openthai
 repo: https://github.com/mochingub-kub/mochilab-openbot-store
 support: https://github.com/mochingub-kub/mochilab-openbot-store#support-and-liability
 gallery: []
 dependencies: []
 releaseNotes: >-
-  Add Thai spoken replies with MakHam Paradee FP32 and FastThaiG2P. Speech
-  recognition and spoken replies share one CPU worker and support up to four
-  requests at a time, including the active request.
+  Rename OpenThai Dictation to Siang เสียง for Thai dictation and spoken replies.
+  This store update uses the same runtime image and keeps the API key, models,
+  and Voice server setup in place.
