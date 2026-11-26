@@ -25,17 +25,41 @@ LOGGER = logging.getLogger("uvicorn.error")
 
 def download(name, target):
     expected_size, expected_digest = ARTIFACTS[name]
-    digest = hashlib.sha256()
-    received = 0
-    with urllib.request.urlopen(f"{BASE_URL}/{name}?download=true", timeout=45) as source, target.open("xb") as output:
-        while block := source.read(1 << 20):
-            received += len(block)
-            if received > expected_size:
+    offset = target.stat().st_size if target.exists() else 0
+    if offset > expected_size:
+        target.unlink()
+        offset = 0
+    if offset < expected_size:
+        headers = {"Range": f"bytes={offset}-"} if offset else {}
+        request = urllib.request.Request(f"{BASE_URL}/{name}?download=true", headers=headers)
+        with urllib.request.urlopen(request, timeout=45) as source:
+            if offset and source.status == 206:
+                content_range = f"bytes {offset}-{expected_size - 1}/{expected_size}"
+                if source.headers.get("Content-Range") != content_range:
+                    raise ValueError("Unexpected HTTP Content-Range for the model artifact")
+            elif source.status == 200:
+                offset = 0
+            else:
+                raise ValueError("Unexpected HTTP response for the model artifact")
+            received = offset
+            oversized = False
+            with target.open("ab" if offset else "wb") as output:
+                while block := source.read(1 << 20):
+                    received += len(block)
+                    if received > expected_size:
+                        oversized = True
+                        break
+                    output.write(block)
+            if oversized:
+                target.unlink()
                 raise ValueError("Model download exceeded its pinned size")
-            digest.update(block)
-            output.write(block)
-    if received != expected_size or digest.hexdigest() != expected_digest:
-        raise ValueError("Model download does not match its pinned SHA-256 and size")
+            if received != expected_size:
+                raise ValueError("Incomplete model download retained for resume")
+    with target.open("rb") as source:
+        valid = hashlib.file_digest(source, "sha256").hexdigest() == expected_digest
+    if not valid:
+        target.unlink()
+        raise ValueError("Model download does not match its pinned SHA-256")
 
 
 def install_model(cache):
@@ -43,27 +67,22 @@ def install_model(cache):
     cache.mkdir(parents=True, exist_ok=True)
     installed = cache / REVISION
     staging = cache / f".{REVISION}.incoming"
-    if staging.exists():
-        shutil.rmtree(staging)
     if installed.is_dir():
         return installed
     LOGGER.info("Downloading and verifying pinned OpenThai FP32 model")
-    staging.mkdir(mode=0o700)
-    try:
-        weight, archive = (staging / name for name in ARTIFACTS)
-        download(weight.name, weight)
-        download(archive.name, archive)
-        with zipfile.ZipFile(archive) as package:
-            if set(package.namelist()) != GRAPH_FILES or len(package.infolist()) != len(GRAPH_FILES):
-                raise ValueError("Unexpected contents in the pinned model archive")
-            for name in sorted(GRAPH_FILES):
-                with package.open(name) as source, (staging / name).open("xb") as output:
-                    shutil.copyfileobj(source, output)
-        archive.unlink()
-        staging.rename(installed)
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging)
+    staging.mkdir(mode=0o700, exist_ok=True)
+    weight, archive = (staging / name for name in ARTIFACTS)
+    download(weight.name, weight)
+    download(archive.name, archive)
+    with zipfile.ZipFile(archive) as package:
+        if set(package.namelist()) != GRAPH_FILES or len(package.infolist()) != len(GRAPH_FILES):
+            raise ValueError("Unexpected contents in the pinned model archive")
+        for name in sorted(GRAPH_FILES):
+            with package.open(name) as source, (staging / name).open("wb") as output:
+                shutil.copyfileobj(source, output)
+    # Keep both inputs recoverable until the verified directory is visible.
+    staging.rename(installed)
+    (installed / archive.name).unlink(missing_ok=True)
     LOGGER.info("OpenThai model files verified")
     return installed
 

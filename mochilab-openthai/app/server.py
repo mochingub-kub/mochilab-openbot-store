@@ -15,10 +15,11 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, Response
 
+from auth import load_key
 from model import OpenThai, SAMPLE_RATE
 
 MODEL_ID = "openthai-2.0-asr-fp32"
-UPLOAD_BYTES = 25_000_000
+UPLOAD_BYTES = 5_000_000
 MAX_AUDIO_FRAMES = 120 * SAMPLE_RATE
 MAX_PENDING = 2
 LOGGER = logging.getLogger("uvicorn.error")
@@ -62,10 +63,7 @@ def read_wave(upload):
 def create_app(load_model=OpenThai):
     @asynccontextmanager
     async def lifespan(app):
-        key = os.environ.get("APP_PASSWORD", "")
-        if len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
-            raise RuntimeError("Umbrel APP_PASSWORD must be a 64-character lowercase hexadecimal key")
-        app.state.key_digest = hashlib.sha256(key.encode()).digest()
+        load_key()
         app.state.model = await anyio.to_thread.run_sync(load_model, os.environ.get("MODEL_CACHE", "/data/models"))
         app.state.worker = asyncio.Semaphore(1)
         app.state.pending = 0
@@ -74,7 +72,10 @@ def create_app(load_model=OpenThai):
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
 
     def authorized(request):
-        expected = request.app.state.key_digest
+        try:
+            expected = hashlib.sha256(load_key().encode()).digest()
+        except (OSError, RuntimeError):
+            return False
         value = request.headers.get("authorization", "")
         scheme, _, token = value.partition(" ")
         candidate = hashlib.sha256(token.encode()).digest()

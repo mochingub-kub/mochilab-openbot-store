@@ -19,11 +19,12 @@ services:
       - |
         from pathlib import Path
         import os
-        path = Path("/data/models")
-        path.mkdir(mode=0o700, exist_ok=True)
-        if path.is_symlink() or not path.is_dir():
-            raise RuntimeError("Invalid model cache path")
-        os.chown(path, 1000, 1000, follow_symlinks=False)
+        for name in ("models", "credentials"):
+            path = Path("/data") / name
+            path.mkdir(mode=0o700, exist_ok=True)
+            if path.is_symlink() or not path.is_dir():
+                raise RuntimeError("Invalid app data path")
+            os.chown(path, 1000, 1000, follow_symlinks=False)
 
   asr:
     image: *image
@@ -34,6 +35,7 @@ services:
     user: "1000:1000"
     cpus: "4.0"
     mem_limit: 4g
+    pids_limit: 128
     read_only: true
     cap_drop: [ALL]
     security_opt:
@@ -52,11 +54,11 @@ services:
         - python
         - -c
         - >-
-          import os, urllib.request;
+          import urllib.request; from auth import load_key;
           request = urllib.request.Request("http://127.0.0.1:8080/v1/models",
-          headers={"Authorization": "Bearer " + os.environ["APP_PASSWORD"]});
+          headers={"Authorization": "Bearer " + load_key()});
           assert urllib.request.urlopen(request, timeout=4).status == 200
       interval: 30s
       timeout: 5s
-      start_period: 5m
+      start_period: 30m
       retries: 10
