@@ -13,6 +13,24 @@ Runs iApp OpenThai 2.0 FP32 (ASR) and PyThaiNLP MakHam Paradee FP32 + FastThaiG2
 
 Stop exposing the API before uninstalling it. Switch OpenBot back to the previous recognizer and speech engine on each device. Uninstalling deletes Umbrel app data, including the downloaded models. The initial Umbrel password is derived from the device and app ID. Reinstalling the same app does not rotate it.
 
+## Cloudflare policy
+
+The Cloudflare WAF for `asr.mochingub.com` allows exactly five method and path pairs:
+
+- `GET /v1/models`
+- `GET /v1/audio/voices`
+- `GET /v1/audio/speech/voices`
+- `POST /v1/audio/transcriptions`
+- `POST /v1/audio/speech`
+
+The host-wide rate limit is 20 requests per 10 seconds per source IP and Cloudflare location, with a 10-second block.
+
+## Roll back an app release and keep the data
+
+1. In a rollback PR, restore the previous known-good image pin in Compose. Keep the app ID and data mount in place. To roll back from 0.2.0 to the ASR-only image, use the pin from [the 0.1.0 Compose file](https://github.com/mochingub-kub/mochilab-openbot-store/blob/db18a6f2885ba1b2c4181c5ca3d5d77e5130f985/mochilab-openthai/docker-compose.yml#L3).
+2. Give the rollback release a new app version so Umbrel offers **Update**. After merge, refresh the community store and apply **Update** to OpenThai Dictation. Use the update in place. Uninstalling deletes the app data.
+3. Wait for the app to start, then test the voice features supported by the restored image. The models and any rotated key stay in the existing app data directory.
+
 ## Rotate the API key
 
 On the Umbrel host, open a private interactive SSH terminal and run:
@@ -25,7 +43,9 @@ The command atomically writes a worker-owned key file with mode 0600 and prints 
 
 ## Build and enable a release
 
-Pull requests build the image locally in CI and test both ASR and TTS runtime inference inside a single container with a 4 GiB memory limit. The registry publish job runs on pushes to `main`. Keep the manifest disabled until the reviewed image has been built on `main`. A follow-up PR pins that commit's image digest and enables the manifest after confirming an anonymous GHCR pull.
+Pull requests build the image locally in CI and test speech recognition and synthesis together in a container with a 4 GiB memory limit. Image source changes merged to `main` trigger the registry publish job.
+
+For an installed app, keep the current `umbrel-app.yml` and Compose image pin in place while staging the update. Keep the app enabled and do not set `disabled: true`. After CI publishes the image from `main`, verify that it pulls anonymously from GHCR. In one release PR, pin the verified digest in Compose and update the manifest version and release notes.
 
 The first start keeps incomplete downloads across restarts. The app validates the archive, G2P files, and model weights by size and SHA-256 before making a model revision available. Startup grace is 30 minutes to allow the models to finish downloading before the healthcheck marks the container unhealthy.
 
