@@ -1,7 +1,5 @@
 manifestVersion: 1.1
 id: mochilab-openthai
-# Enable only after the reviewed main-branch image is built and pinned.
-disabled: true
 name: OpenThai Dictation
 tagline: Thai speech recognition for OpenBot
 category: ai
