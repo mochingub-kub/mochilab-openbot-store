@@ -62,7 +62,9 @@ class AppTest(unittest.TestCase):
         for url in ("/", "/docs", "/openapi.json", "/redoc", "/v1/models/"):
             self.assertEqual(self.client.get(url, headers=AUTH).status_code, 404)
         self.assertEqual(self.client.post("/v1/models", headers=AUTH).status_code, 405)
-        self.assertEqual(self.client.get("/v1/models", headers=AUTH).json()["data"][0]["id"], MODEL_ID)
+        response = self.client.get("/v1/models", headers=AUTH)
+        self.assertEqual(response.json()["data"][0]["id"], MODEL_ID)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_transcription_and_input_limits(self):
         result = self.send()

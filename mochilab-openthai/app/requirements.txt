@@ -5,3 +5,4 @@ python-multipart==0.0.34
 numpy==2.5.5
 scipy==1.18.1
 onnxruntime==1.32.0
+anyio==4.16.0

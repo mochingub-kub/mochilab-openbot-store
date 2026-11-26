@@ -82,13 +82,16 @@ def create_app(load_model=OpenThai):
         return scheme.lower() == "bearer" and match
 
     def deny():
-        return Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+        return Response(status_code=401, headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"})
 
     @app.get("/v1/models")
     async def models(request: Request):
         if not authorized(request):
             return deny()
-        return {"object": "list", "data": [{"id": MODEL_ID, "object": "model", "task": "automatic-speech-recognition"}]}
+        return JSONResponse(
+            {"object": "list", "data": [{"id": MODEL_ID, "object": "model", "task": "automatic-speech-recognition"}]},
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.post("/v1/audio/transcriptions")
     async def transcribe(request: Request):
