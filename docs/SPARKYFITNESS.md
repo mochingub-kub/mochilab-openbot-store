@@ -9,7 +9,7 @@ Do not install two packages that use port 3019 on the same host.
 - Stable application: [v1.12.1](https://github.com/CodeWithCJ/SparkyFitness/releases/tag/v1.12.1), released 2026-11-10.
 - Package source: [commit 324d48d](https://github.com/CodeWithCJ/SparkyFitness/tree/324d48d5c8835d4726d5e22c16fcbe3b9298bc48/umbrel/sparkyfitness).
 - Application source: [commit 39d9ca2](https://github.com/CodeWithCJ/SparkyFitness/tree/39d9ca2d13c2a1b9f64e4be793b2f23433489d0c).
-- [Upstream Umbrel guide](https://codewithcj.github.io/SparkyFitness/install/umbrel).
+- [Upstream Umbrel guide](https://codewithcj.github.io/SparkyFitness/install/umbrel) and [upstream issue tracker](https://github.com/CodeWithCJ/SparkyFitness/issues).
 - Exact adaptation: [provenance](sparkyfitness-provenance.json).
 
 The release tag still contains the previous Umbrel image pins.
@@ -24,10 +24,7 @@ The full upstream non-commercial license is included with the package and vendor
 
 ## Compatibility and limits
 
-The inspected device reports umbrelOS 2.0.0 on Intel x86-64.
-The installed-app result contains OpenBot and no SparkyFitness package.
-That result is not a scan for unmanaged containers or listening ports.
-Verify port 3019 before installation.
+Check that port 3019 is free on your Umbrel before installation.
 
 The package uses native Umbrel gateway configuration and service-health dependencies.
 The backend runs as UID/GID 1000 and stores uploads, backup archives and temporary uploads under `data/`.
