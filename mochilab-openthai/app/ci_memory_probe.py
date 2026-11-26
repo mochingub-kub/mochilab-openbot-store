@@ -1,4 +1,4 @@
-"""Run the public Thai smoke test against the constrained CI container."""
+"""Run the public Thai ASR + TTS smoke and memory probe against the constrained CI container."""
 import csv
 import io
 import os
@@ -17,6 +17,7 @@ from scipy.io import wavfile
 DATASET = "https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/th_th"
 FILENAME = "10817866832102011221.wav"
 MODEL_ID = "openthai-2.0-asr-fp32"
+TTS_MODEL_ID = "makham-paradee-tts-fp32"
 CAP_GIB = 4
 
 
@@ -64,13 +65,59 @@ def main():
             if docker("inspect", "-f", "{{.State.Running}}", container) != "true":
                 raise RuntimeError("OpenThai container exited during model initialization")
             try:
-                if client.get("/v1/models", headers=headers, timeout=3).status_code == 200:
+                res = client.get("/v1/models", headers=headers, timeout=3)
+                if res.status_code == 200:
+                    model_ids = [item["id"] for item in res.json()["data"]]
+                    assert MODEL_ID in model_ids and TTS_MODEL_ID in model_ids
                     break
             except httpx.TransportError:
                 pass
             time.sleep(4)
         else:
             raise TimeoutError("Container did not become ready")
+
+        voices = client.get("/v1/audio/voices", headers=headers, timeout=5).raise_for_status().json()
+        assert "paradee" in voices["voices"]
+
+        # 1. Test TTS synthesis (short and long multi-chunk > 400 phonemes)
+        tts_started = time.monotonic()
+        tts_short = client.post(
+            "/v1/audio/speech",
+            headers=headers,
+            json={
+                "model": TTS_MODEL_ID,
+                "input": "สวัสดีค่ะ วันนี้อากาศดีมาก ขอให้เป็นวันที่สดใสนะคะ",
+                "voice": "paradee",
+                "response_format": "wav",
+            },
+        ).raise_for_status()
+        tts_short_s = time.monotonic() - tts_started
+        with wave.open(io.BytesIO(tts_short.content), "rb") as wav_in:
+            assert (wav_in.getnchannels(), wav_in.getsampwidth(), wav_in.getframerate()) == (1, 2, 24000)
+            tts_short_dur = wav_in.getnframes() / 24000.0
+            assert tts_short_dur > 2.0
+
+        long_text = (
+            "การรันโมเดลเสียงพูดภาษาไทยบนซีพียูภายในบ้านช่วยให้ข้อมูลส่วนตัวปลอดภัย "
+            "ไม่ต้องส่งข้อความออกไปประมวลผลข้างนอก และยังใช้งานได้ฟรีทั้งบนคอมพิวเตอร์และโทรศัพท์มือถือทุกที่ทุกเวลา "
+        ) * 5
+        tts_long_started = time.monotonic()
+        tts_long = client.post(
+            "/v1/audio/speech",
+            headers=headers,
+            json={
+                "model": TTS_MODEL_ID,
+                "input": long_text[:950],
+                "voice": "paradee",
+                "response_format": "wav",
+            },
+        ).raise_for_status()
+        tts_long_s = time.monotonic() - tts_long_started
+        with wave.open(io.BytesIO(tts_long.content), "rb") as wav_in:
+            assert (wav_in.getnchannels(), wav_in.getsampwidth(), wav_in.getframerate()) == (1, 2, 24000)
+            assert wav_in.getnframes() / 24000.0 > 20.0
+
+        # 2. Test ASR (short FLEURS exact match + full 120 s clip)
         clip, reference = get_clip()
 
         def send(samples):
@@ -93,7 +140,8 @@ def main():
     assert peak * 1024 < cap
     cgroup_peak = int(docker("exec", container, "cat", "/sys/fs/cgroup/memory.peak"))
     print(f"120S_RESULT cap={CAP_GIB:.1f}GiB process_peak={peak / 1024**2:.2f}GiB "
-          f"cgroup_peak={cgroup_peak / 1024**3:.2f}GiB wall={elapsed:.2f}s short_clip=exact")
+          f"cgroup_peak={cgroup_peak / 1024**3:.2f}GiB asr_wall={elapsed:.2f}s "
+          f"tts_short={tts_short_s:.3f}s tts_long={tts_long_s:.3f}s short_clip=exact")
 
 
 if __name__ == "__main__":
