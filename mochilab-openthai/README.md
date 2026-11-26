@@ -27,7 +27,7 @@ The host-wide rate limit is 20 requests per 10 seconds per source IP and Cloudfl
 
 ## Roll back an app release and keep the data
 
-1. In a rollback PR, restore the previous known-good image pin in Compose. Keep the app ID and data mount in place. To roll back from 0.2.0 to the ASR-only image, use the pin from [the 0.1.0 Compose file](https://github.com/mochingub-kub/mochilab-openbot-store/blob/db18a6f2885ba1b2c4181c5ca3d5d77e5130f985/mochilab-openthai/docker-compose.yml#L3).
+1. In a rollback PR, restore the previous known-good image pin in Compose. Keep the app ID and data mount in place. To roll back from 0.2.0 to the ASR-only image, use the pin from [the 0.1.0 Compose file](https://github.com/mochingub-kub/mochilab-umbrel-store/blob/db18a6f2885ba1b2c4181c5ca3d5d77e5130f985/mochilab-openthai/docker-compose.yml#L3).
 2. Give the rollback release a new app version so Umbrel offers **Update**. After merge, refresh the community store and apply **Update** to Siang เสียง. Use the update in place. Uninstalling deletes the app data.
 3. Wait for the app to start, then test the voice features supported by the restored image. The models and any rotated key stay in the existing app data directory.
 

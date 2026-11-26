@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mochilab-openthai
 name: Siang เสียง
 tagline: Thai speech-to-text and spoken replies on your Umbrel
-icon: https://raw.githubusercontent.com/mochingub-kub/mochilab-openbot-store/main/mochilab-openthai/icon.svg
+icon: https://raw.githubusercontent.com/mochingub-kub/mochilab-umbrel-store/main/mochilab-openthai/icon.svg
 category: ai
 version: "0.2.1"
 port: 18081
@@ -17,9 +17,9 @@ description: >-
   in app data and reused across updates. Setup takes place in Umbrel and OpenBot.
 developer: Mochilab
 submitter: Mochilab
-website: https://github.com/mochingub-kub/mochilab-openbot-store/tree/main/mochilab-openthai
-repo: https://github.com/mochingub-kub/mochilab-openbot-store
-support: https://github.com/mochingub-kub/mochilab-openbot-store#support-and-liability
+website: https://github.com/mochingub-kub/mochilab-umbrel-store/tree/main/mochilab-openthai
+repo: https://github.com/mochingub-kub/mochilab-umbrel-store
+support: https://github.com/mochingub-kub/mochilab-umbrel-store#support-and-liability
 gallery: []
 dependencies: []
 releaseNotes: >-
