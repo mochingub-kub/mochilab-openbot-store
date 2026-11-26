@@ -32,7 +32,11 @@ limitations under the License.
 """
 
 from __future__ import annotations
+import os
 import re
+
+os.environ.setdefault("PYTHAINLP_READ_ONLY", "1")
+os.environ.setdefault("PYTHAINLP_OFFLINE", "1")
 from pythainlp.util import expand_maiyamok as _expand_maiyamok_pythainlp
 
 # pythainlp defers its dictionary load to the first call — pay that cost at

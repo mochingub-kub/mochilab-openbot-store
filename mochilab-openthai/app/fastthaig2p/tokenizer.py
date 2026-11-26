@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Iterable, Optional, Union
 
+os.environ.setdefault("PYTHAINLP_READ_ONLY", "1")
+os.environ.setdefault("PYTHAINLP_OFFLINE", "1")
 from pythainlp.tokenize import Tokenizer as _PyThaiTokenizer
 
 from ._data import data_path
