@@ -1,20 +1,22 @@
-# Mochilab Community App Store
+# Mochilab Umbrel Store
 
-An unofficial collection of self-hosted apps for [umbrelOS](https://umbrel.com/). Mochilab packages the apps for personal use and shares the recipes here.
+A community store for [umbrelOS](https://umbrel.com/) with three self-hosted apps for AI teammates, Thai voice, and fitness tracking.
 
 ## Apps
 
-| App | What it does | Package details |
-| --- | --- | --- |
-| **OpenBot** | Runs the Nightly Labs OpenBot engine on your Umbrel for persistent AI teammates. | [Manifest](mochilab-openbot/umbrel-app.yml) · [Setup](#openbot-setup) · [Safe updates](docs/SAFE-UPDATER.md) |
-| **Siang เสียง** | Runs Thai speech-to-text and Thai spoken replies for OpenBot on your Umbrel. | [Manifest](mochilab-openthai/umbrel-app.yml) · [Setup and rollback](mochilab-openthai/README.md) |
-| **SparkyFitness** | Tracks nutrition, exercise, and body metrics on your Umbrel. | [Manifest](mochilab-sparkyfitness/umbrel-app.yml) · [Setup and backups](docs/SPARKYFITNESS.md) |
+| Icon | App | What it does | Status | Package details |
+| :---: | --- | --- | --- | --- |
+| <img src="https://openbot.run/favicon.ico" width="28" height="28" alt=""> | **OpenBot** | Run the Nightly Labs OpenBot engine on your Umbrel for persistent AI teammates. | Available | [Manifest](mochilab-openbot/umbrel-app.yml) · [Setup](#openbot-setup) · [Safe updates](docs/SAFE-UPDATER.md) |
+| <img src="./mochilab-openthai/icon.svg" width="28" height="28" alt=""> | **Siang เสียง** | Dictate in Thai and hear Thai replies in OpenBot. Speech processing runs on your Umbrel. | Available | [Manifest](mochilab-openthai/umbrel-app.yml) · [Setup and rollback](mochilab-openthai/README.md) |
+| <img src="https://raw.githubusercontent.com/CodeWithCJ/SparkyFitness/324d48d5c8835d4726d5e22c16fcbe3b9298bc48/docs/src/public/logo.png" width="28" height="28" alt=""> | **SparkyFitness** | Track nutrition, exercise, and body metrics on your Umbrel. | Available | [Manifest](mochilab-sparkyfitness/umbrel-app.yml) · [Setup and backups](docs/SPARKYFITNESS.md) |
 
 ## Add the store on umbrelOS
 
 1. Open **App Store** from the Umbrel dock. In the top-right menu (**⋯**), choose **Community App Stores**.
-2. Paste `https://github.com/mochingub-kub/mochilab-openbot-store` and click **Add**.
-3. Click **Open** next to **Mochilab**, then choose an app and click **Install**.
+2. Paste `https://github.com/mochingub-kub/mochilab-umbrel-store` and click **Add**.
+3. Click **Open** next to **Mochilab Umbrel Store**, then choose an app and click **Install**.
+
+If the new URL is still pending, use the URL of this GitHub repository.
 
 [Umbrel's community store guide](https://umbrel.com/support/apps/how-to-add-a-community-app-store) shows the menu and dialog.
 
