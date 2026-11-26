@@ -2,6 +2,7 @@ manifestVersion: 1.1
 id: mochilab-openthai
 name: OpenThai Dictation
 tagline: Thai speech recognition and spoken replies for OpenBot
+icon: https://raw.githubusercontent.com/mochingub-kub/mochilab-openbot-store/main/mochilab-openthai/icon.svg
 category: ai
 version: "0.2.0"
 port: 18081
