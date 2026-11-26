@@ -4,7 +4,8 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_
 WORKDIR /app
 COPY requirements.lock .
 RUN pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements.lock
-COPY auth.py model.py server.py LICENSE.OpenThai ./
+COPY auth.py model.py server.py LICENSE.OpenThai LICENSE.FastThaiG2P ./
+COPY fastthaig2p ./fastthaig2p
 USER 1000:1000
 EXPOSE 8080
 CMD ["uvicorn","server:app","--host","0.0.0.0","--port","8080","--workers","1","--no-access-log","--no-proxy-headers","--limit-concurrency","16"]

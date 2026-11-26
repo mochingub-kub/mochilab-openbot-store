@@ -1,14 +1,19 @@
 import hashlib
+import io
+import json
 import logging
 from pathlib import Path
 import shutil
 import urllib.request
+import wave
 import zipfile
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 import onnxruntime as ort
 from scipy.fft import rfft
+
+from fastthaig2p import G2P, ipa_to_kokoro, normalize, set_data_root
 
 REVISION = "9f142a4"
 BASE_URL = f"https://huggingface.co/iapp/OpenThai2.0-ASR-Streaming-ONNX/resolve/{REVISION}"
@@ -20,18 +25,77 @@ GRAPH_FILES = {"encoder.onnx", "decoder_joint.onnx", "tokens.txt"}
 SAMPLE_RATE = 16_000
 CHUNK_SAMPLES = 20 * SAMPLE_RATE
 FRONTEND_WINDOW = np.pad(np.hanning(400).astype("float32"), (56, 56))
+
+TTS_REVISION = "cd812941e8848bffe0dcc9182720ba7cc8ddd13e"
+TTS_BASE_URL = f"https://huggingface.co/pythainlp/MakHamTTS/resolve/{TTS_REVISION}/paradee_thai"
+G2P_REVISION = "c41fa9006869dd3f7b8fc861de16388e89d8ad0c"
+G2P_BASE_URL = f"https://raw.githubusercontent.com/awslabs/FastThaiG2P/{G2P_REVISION}/data"
+TTS_ARTIFACTS = {
+    "paradee_thai.onnx": (
+        f"{TTS_BASE_URL}/paradee_thai.onnx?download=true",
+        34_778_468,
+        "245dd682d70b9ec72ff480ecd1fa139d1c792100417a97f1f56390c9965a7a1e",
+    ),
+    "config.json": (
+        f"{TTS_BASE_URL}/config.json?download=true",
+        2_669,
+        "1340bbfedc4871b311c8dedcd5cf85022f80773db120b1cd85883ecb1883ca43",
+    ),
+    "g2p/dict.txt": (
+        f"{G2P_BASE_URL}/dict.txt",
+        1_520_330,
+        "0e64eeb8b75343c624abbccee03eb69ec6aa53de350763e3be5479779e77a9e3",
+    ),
+    "g2p/ipa.json": (
+        f"{G2P_BASE_URL}/ipa.json",
+        3_661_000,
+        "affeb3c09478f0d8b1e0f01e9d0174b9c7084b84a1c7547b45b204b2a9dc3971",
+    ),
+    "g2p/fallback/PhSTrigram.sts": (
+        f"{G2P_BASE_URL}/fallback/PhSTrigram.sts",
+        1_400_502,
+        "b36b0af18d29d16169305c1c76a91cfeb9742e7bc37692ea2235bbf30e916df3",
+    ),
+    "g2p/fallback/sylform_var.pkl": (
+        f"{G2P_BASE_URL}/fallback/sylform_var.pkl",
+        249_521,
+        "152d1395b9251075d41e96f65fa2e7a50cc319c71bf8308b7c19fe35a083836f",
+    ),
+    "g2p/fallback/sylrule.lts": (
+        f"{G2P_BASE_URL}/fallback/sylrule.lts",
+        3_855,
+        "58e73cb4eda8c4126a5f9f5ea0aa2a38e8dcc1d6e6d6de324be7d6833d248d1f",
+    ),
+    "g2p/fallback/sylseg.3g": (
+        f"{G2P_BASE_URL}/fallback/sylseg.3g",
+        15_795_689,
+        "3450baabc27dbb078939eb0729083e60d51c7b13363d3641cc605faaf32b502e",
+    ),
+    "g2p/fallback/thaisyl.dict": (
+        f"{G2P_BASE_URL}/fallback/thaisyl.dict",
+        31_777,
+        "90928774b54f00ad7f25cfb13703d5f549f4fa65458002cd75387f3616a1e0fb",
+    ),
+    "g2p/fallback/thdict": (
+        f"{G2P_BASE_URL}/fallback/thdict",
+        2_402_529,
+        "8727c78b62b13b5adeef24d2b1abcd4e7a1cf6be54b7590c32f8acebc2850b76",
+    ),
+}
+TTS_SAMPLE_RATE = 24_000
+MAX_TTS_PHONEMES = 400
 LOGGER = logging.getLogger("uvicorn.error")
 
 
-def download(name, target):
-    expected_size, expected_digest = ARTIFACTS[name]
+def download_url(url, target, expected_size, expected_digest):
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     offset = target.stat().st_size if target.exists() else 0
     if offset > expected_size:
         target.unlink()
         offset = 0
     if offset < expected_size:
         headers = {"Range": f"bytes={offset}-"} if offset else {}
-        request = urllib.request.Request(f"{BASE_URL}/{name}?download=true", headers=headers)
+        request = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(request, timeout=45) as source:
             if offset and source.status == 206:
                 content_range = f"bytes {offset}-{expected_size - 1}/{expected_size}"
@@ -62,6 +126,11 @@ def download(name, target):
         raise ValueError("Model download does not match its pinned SHA-256")
 
 
+def download(name, target):
+    expected_size, expected_digest = ARTIFACTS[name]
+    download_url(f"{BASE_URL}/{name}?download=true", target, expected_size, expected_digest)
+
+
 def install_model(cache):
     cache = Path(cache)
     cache.mkdir(parents=True, exist_ok=True)
@@ -84,6 +153,23 @@ def install_model(cache):
     staging.rename(installed)
     (installed / archive.name).unlink(missing_ok=True)
     LOGGER.info("OpenThai model files verified")
+    return installed
+
+
+def install_tts_model(cache):
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    revision_key = f"paradee-{TTS_REVISION[:7]}-{G2P_REVISION[:7]}"
+    installed = cache / revision_key
+    staging = cache / f".{revision_key}.incoming"
+    if installed.is_dir():
+        return installed
+    LOGGER.info("Downloading and verifying pinned MakHam Paradee FP32 TTS model")
+    staging.mkdir(mode=0o700, exist_ok=True)
+    for rel_path, (url, expected_size, expected_digest) in TTS_ARTIFACTS.items():
+        download_url(url, staging / rel_path, expected_size, expected_digest)
+    staging.rename(installed)
+    LOGGER.info("MakHam Paradee TTS model files verified")
     return installed
 
 
@@ -121,6 +207,50 @@ def audio_chunks(waveform):
         yield waveform[:split]
         waveform = waveform[split:]
     yield waveform
+
+
+def split_phoneme_words(words, max_phonemes=MAX_TTS_PHONEMES):
+    chunks = []
+    current = []
+    current_len = 0
+    for word in words:
+        word = word.strip()
+        if not word:
+            continue
+        while len(word) > max_phonemes:
+            if current:
+                chunks.append(" ".join(current))
+                current = []
+                current_len = 0
+            cut = word.rfind(".", 0, max_phonemes)
+            if cut <= 0:
+                cut = max_phonemes
+            chunks.append(word[:cut].strip("."))
+            word = word[cut:].lstrip(".")
+        if not word:
+            continue
+        added = len(word) if not current else current_len + 1 + len(word)
+        if current and added > max_phonemes:
+            chunks.append(" ".join(current))
+            current = [word]
+            current_len = len(word)
+        else:
+            current.append(word)
+            current_len = added
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
+
+
+def encode_wav_24k(samples):
+    pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(TTS_SAMPLE_RATE)
+        writer.writeframes(pcm.tobytes())
+    return buffer.getvalue()
 
 
 class OpenThai:
@@ -174,3 +304,59 @@ class OpenThai:
 
     def transcribe(self, waveform):
         return " ".join(text for chunk in audio_chunks(waveform) if (text := self._decode(chunk)))
+
+
+class MakHamParadee:
+    def __init__(self, cache):
+        path = install_tts_model(cache)
+        set_data_root(path / "g2p")
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 4
+        options.inter_op_num_threads = 1
+        options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        options.add_session_config_entry("session.inter_op.allow_spinning", "0")
+        options.add_session_config_entry("session.disable_prepacking", "1")
+        self.session = ort.InferenceSession(
+            str(path / "paradee_thai.onnx"), options, providers=["CPUExecutionProvider"]
+        )
+        config = json.loads((path / "config.json").read_text(encoding="utf-8"))
+        self.vocab = config["vocab"]
+        self.g2p = G2P(dict_path=path / "g2p" / "dict.txt", ipa_path=path / "g2p" / "ipa.json")
+        if {item.name for item in self.session.get_inputs()} != {"input_ids", "speed"}:
+            raise RuntimeError("Unexpected MakHam Paradee graph interface")
+
+    def _phoneme_words(self, text):
+        clauses = [clause.strip() for clause in str(text).replace("\r", "\n").split("\n") if clause.strip()]
+        words = []
+        for clause in clauses:
+            converted = ipa_to_kokoro(self.g2p.convert(clause))
+            filtered = " ".join(
+                "".join(ch for ch in token if ch in self.vocab)
+                for token in converted.split()
+            )
+            words.extend(token for token in filtered.split() if token)
+        return words
+
+    def synthesize(self, text, speed=1.0):
+        words = self._phoneme_words(text)
+        chunks = split_phoneme_words(words, MAX_TTS_PHONEMES)
+        if not chunks:
+            return encode_wav_24k(np.zeros(int(0.05 * TTS_SAMPLE_RATE), dtype="float32"))
+        segments = []
+        speed_tensor = np.array([float(speed)], dtype="float32")
+        for chunk in chunks:
+            ids = [0] + [self.vocab[c] for c in chunk if c in self.vocab] + [0]
+            if len(ids) <= 2:
+                continue
+            audio = self.session.run(
+                None,
+                {
+                    "input_ids": np.array([ids], dtype="int64"),
+                    "speed": speed_tensor,
+                },
+            )[0][0].reshape(-1).astype("float32")
+            if len(audio):
+                segments.append(audio)
+        if not segments:
+            return encode_wav_24k(np.zeros(int(0.05 * TTS_SAMPLE_RATE), dtype="float32"))
+        return encode_wav_24k(np.concatenate(segments))

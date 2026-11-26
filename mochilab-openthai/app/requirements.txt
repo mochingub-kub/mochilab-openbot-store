@@ -6,3 +6,4 @@ numpy==2.5.5
 scipy==1.18.1
 onnxruntime==1.32.0
 anyio==4.16.0
+pythainlp==5.4.0

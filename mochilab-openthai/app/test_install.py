@@ -89,6 +89,47 @@ class ModelInstallTest(unittest.TestCase):
         )))
         self.assertEqual((model.install_model(self.cache) / "encoder.onnx.data").read_bytes(), self.weight)
 
+    def test_existing_asr_cache_skips_redownload_during_tts_upgrade(self):
+        existing_asr = self.cache / model.REVISION
+        existing_asr.mkdir()
+        for name in model.GRAPH_FILES | {"encoder.onnx.data"}:
+            (existing_asr / name).write_bytes(b"cached")
+        tts_payloads = {
+            "paradee_thai.onnx": b"onnx-graph",
+            "config.json": b'{"vocab":{"a":1}}',
+            "g2p/dict.txt": b"word\n",
+            "g2p/ipa.json": b"{}",
+        }
+        tts_lookup = {
+            rel: (f"https://example.test/{rel}", len(data), hashlib.sha256(data).hexdigest())
+            for rel, data in tts_payloads.items()
+        }
+        self.enterContext(patch.object(model, "TTS_ARTIFACTS", tts_lookup))
+        fetched_urls = []
+
+        def fetch(request, timeout):
+            fetched_urls.append(request.full_url)
+            rel = request.full_url.removeprefix("https://example.test/")
+            return Response(tts_payloads[rel])
+
+        self.enterContext(patch.object(model.urllib.request, "urlopen", side_effect=fetch))
+        self.assertEqual(model.install_model(self.cache), existing_asr)
+        self.assertEqual(fetched_urls, [])
+        installed_tts = model.install_tts_model(self.cache)
+        self.assertEqual(len(fetched_urls), len(tts_payloads))
+        self.assertTrue((installed_tts / "paradee_thai.onnx").is_file())
+        self.assertTrue((installed_tts / "g2p" / "dict.txt").is_file())
+
+    def test_split_phoneme_words_enforces_400_phoneme_limit(self):
+        words = ["sa↓.wat↓.diː→"] * 45
+        chunks = model.split_phoneme_words(words, max_phonemes=400)
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 400 for chunk in chunks))
+        long_single_word = ".".join(["kaː→"] * 120)
+        long_chunks = model.split_phoneme_words([long_single_word], max_phonemes=400)
+        self.assertGreater(len(long_chunks), 1)
+        self.assertTrue(all(len(chunk) <= 400 for chunk in long_chunks))
+
 
 class AuthStartupTest(unittest.TestCase):
     def setUp(self):
@@ -98,12 +139,14 @@ class AuthStartupTest(unittest.TestCase):
 
     def test_invalid_umbrel_key_fails_before_model_load(self):
         engine = Mock()
+        tts_engine = Mock()
         for key in ("", "z" * 64, "a" * 63):
             with patch.dict(os.environ, {"APP_PASSWORD": key}):
                 with self.assertRaisesRegex(RuntimeError, "64-character"):
-                    with TestClient(create_app(engine)):
+                    with TestClient(create_app(engine, tts_engine)):
                         self.fail("Invalid key started the service")
         engine.assert_not_called()
+        tts_engine.assert_not_called()
 
     def test_override_requires_mode_length_and_printable_ascii(self):
         for value, mode, message in [
@@ -121,7 +164,7 @@ class AuthStartupTest(unittest.TestCase):
 
     def test_rotation_replaces_umbrel_key_without_restart(self):
         with patch.dict(os.environ, {"APP_PASSWORD": "a" * 64}):
-            with TestClient(create_app(Mock())) as client:
+            with TestClient(create_app(Mock(), Mock())) as client:
                 def check(key):
                     return client.get("/v1/models", headers={"Authorization": "Bearer " + key}).status_code
                 self.assertEqual(check("a" * 64), 200)
