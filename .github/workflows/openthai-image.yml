@@ -1,0 +1,58 @@
+name: OpenThai API tests and image
+on:
+  pull_request:
+    paths:
+      - 'mochilab-openthai/**'
+      - '.github/workflows/openthai-image.yml'
+  push:
+    branches: [main, kit/mochilab-openthai]
+    paths:
+      - 'mochilab-openthai/app/**'
+      - '.github/workflows/openthai-image.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Test API and limits
+        run: |
+          python -m pip install --disable-pip-version-check -r mochilab-openthai/app/requirements.txt 'httpx==0.28.1'
+          python -B -m unittest discover -s mochilab-openthai/app -v
+
+  publish:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/mochingub-kub/mochilab-openthai
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify the amd64 runtime
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 --load \
+            --tag "$IMAGE:$GITHUB_SHA" mochilab-openthai/app
+          docker run --rm --entrypoint python "$IMAGE:$GITHUB_SHA" \
+            -c 'import os, server; assert os.getuid() == 1000; print("Non-root API imports successfully")'
+      - name: Publish code-only image and record digest
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          reference="$(docker image inspect "$IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
+          [[ "$reference" =~ @sha256:[0-9a-f]{64}$ ]]
+          printf 'Image: `%s`\n' "$reference" >> "$GITHUB_STEP_SUMMARY"

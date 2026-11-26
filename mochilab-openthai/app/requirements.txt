@@ -1,0 +1,7 @@
+fastapi==0.165.0
+starlette==1.10.0
+uvicorn==0.54.0
+python-multipart==0.0.34
+numpy==2.5.5
+scipy==1.18.1
+onnxruntime==1.32.0
