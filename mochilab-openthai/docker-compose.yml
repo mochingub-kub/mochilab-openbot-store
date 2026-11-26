@@ -1,0 +1,62 @@
+version: "3.7"
+
+x-image: &image ghcr.io/mochingub-kub/mochilab-openthai:449adba571b9f1ec64bd76298a929d46b1553a02@sha256:00a1f23c2814cbbd3f738a926524e5ef4b763f6fc5a5143dc8e5dc9c927098d3
+
+services:
+  model-cache-permissions:
+    image: *image
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        from pathlib import Path
+        import os
+        path = Path("/data/models")
+        path.mkdir(mode=0o700, exist_ok=True)
+        if path.is_symlink() or not path.is_dir():
+            raise RuntimeError("Invalid model cache path")
+        os.chown(path, 1000, 1000, follow_symlinks=False)
+
+  asr:
+    image: *image
+    depends_on:
+      model-cache-permissions:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    user: "1000:1000"
+    cpus: "4.0"
+    mem_limit: 4g
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?Umbrel app password required}
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    tmpfs:
+      - /tmp:size=16m,mode=1777,nosuid,nodev,noexec
+    ports:
+      - "${MOCHILAB_OPENTHAI_LAN_IP:-127.0.0.1}:18081:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          request = urllib.request.Request("http://127.0.0.1:8080/v1/models",
+          headers={"Authorization": "Bearer " + os.environ["APP_PASSWORD"]});
+          assert urllib.request.urlopen(request, timeout=4).status == 200
+      interval: 30s
+      timeout: 5s
+      start_period: 5m
+      retries: 10

@@ -1,0 +1,24 @@
+manifestVersion: 1.1
+id: mochilab-openthai
+name: OpenThai Dictation
+tagline: Thai speech recognition for OpenBot
+category: ai
+version: "0.1.0"
+port: 18081
+storage:
+  dataRoot: data
+deterministicPassword: true
+description: >-
+  Run the OpenThai 2.0 FP32 speech recognizer on your Umbrel CPU. This app provides
+  a bearer-authenticated OpenAI-compatible dictation API. Use its Umbrel
+  Credentials password as the API key. The first start downloads about 2.60 GB
+  of checksum-pinned model files. No browser UI is provided.
+developer: Mochilab
+website: https://huggingface.co/iapp/OpenThai2.0-ASR-Streaming-ONNX
+repo: https://github.com/mochingub-kub/mochilab-openbot-store
+support: https://github.com/mochingub-kub/mochilab-openbot-store#support-and-liability
+gallery: []
+dependencies: []
+releaseNotes: >-
+  First release. Accepts short Thai dictation recordings with a two-request
+  admission limit and one CPU inference at a time.
