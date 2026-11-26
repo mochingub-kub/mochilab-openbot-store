@@ -135,7 +135,7 @@ The official Umbrel linter is pinned to `067355c29a3846b5261e6d5fde8c1e956e98551
 The Compose fixture is the configuration-only gateway overlay from umbrelOS 2.0.0.
 It is never a runtime proxy image.
 
-On 2026-11-17, the [isolated GitHub Actions acceptance run](https://github.com/mochingub-kub/mochilab-openbot-store/actions/runs/44040573471)
+On 2026-11-17, the [isolated GitHub Actions acceptance run](https://github.com/mochingub-kub/mochilab-umbrel-store/actions/runs/44040573471)
 passed with the published v1.12.1 images:
 
 1. Fresh PostgreSQL 18 startup, 305 application migrations and backend readiness.

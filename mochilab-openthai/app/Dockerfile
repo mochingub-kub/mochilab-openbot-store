@@ -1,5 +1,5 @@
 FROM python:3.14-slim-bookworm@sha256:e60ad028afdcdd14772a3d46decf0eaf616720f9102aeb4397a2045ff6718c3d
-LABEL org.opencontainers.image.source="https://github.com/mochingub-kub/mochilab-openbot-store"
+LABEL org.opencontainers.image.source="https://github.com/mochingub-kub/mochilab-umbrel-store"
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=4 PYTHAINLP_READ_ONLY=1 PYTHAINLP_OFFLINE=1
 WORKDIR /app
 COPY requirements.lock .

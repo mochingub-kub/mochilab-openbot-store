@@ -31,7 +31,7 @@ developer: Nightly Labs
 website: https://openbot.run
 dependencies: []
 repo: https://github.com/nightly-labs/openbot
-support: https://github.com/mochingub-kub/mochilab-openbot-store#support-and-liability
+support: https://github.com/mochingub-kub/mochilab-umbrel-store#support-and-liability
 port: 26771
 gallery: []
 path: ""

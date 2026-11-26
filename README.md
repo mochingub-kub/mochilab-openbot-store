@@ -16,8 +16,6 @@ A community store for [umbrelOS](https://umbrel.com/) with three self-hosted app
 2. Paste `https://github.com/mochingub-kub/mochilab-umbrel-store` and click **Add**.
 3. Click **Open** next to **Mochilab Umbrel Store**, then choose an app and click **Install**.
 
-If the new URL is still pending, use the URL of this GitHub repository.
-
 [Umbrel's community store guide](https://umbrel.com/support/apps/how-to-add-a-community-app-store) shows the menu and dialog.
 
 ## OpenBot setup
