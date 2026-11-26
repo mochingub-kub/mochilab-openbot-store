@@ -1,6 +1,6 @@
 version: "3.7"
 
-x-image: &image ghcr.io/mochingub-kub/mochilab-openthai:52f9a25a08d2a3e867729c0a3cabd9cdef1e7b96@sha256:5d897b567e6956f233302a5d8cdb023d27699d94882b5e5b9ad2ef9f531bfab5
+x-image: &image ghcr.io/mochingub-kub/mochilab-openthai:db1d77ed298e2a7251167980d741f7056f4bb925@sha256:48f0e64e85695347d8ee10d94d96ba95da22c4aa9846f826480a9753cc816474
 
 services:
   model-cache-permissions:
