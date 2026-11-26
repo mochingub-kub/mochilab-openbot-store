@@ -1,0 +1,79 @@
+name: OpenThai API tests and image
+on:
+  pull_request:
+    paths:
+      - 'mochilab-openthai/**'
+      - '.github/workflows/openthai-image.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'mochilab-openthai/app/**'
+      - '.github/workflows/openthai-image.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Test API, downloads and key rotation
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: \
+            -r mochilab-openthai/app/requirements.lock -r mochilab-openthai/app/requirements-ci.lock
+          python -B -m unittest discover -s mochilab-openthai/app -v
+      - name: Measure 120 seconds of audio with a 4 GiB memory limit
+        env:
+          ASR_CI_CONTAINER: openthai-memory-test
+        run: |
+          set -euo pipefail
+          export APP_PASSWORD="$(printf '%064d' 0)"
+          image=openthai-ci:local
+          volume=openthai-ci-model
+          docker buildx build --platform linux/amd64 --load --tag "$image" mochilab-openthai/app
+          docker run --rm --entrypoint python "$image" -c 'import os, server; assert os.getuid() == 1000'
+          cleanup() {
+            docker logs "$ASR_CI_CONTAINER" 2>/dev/null || true
+            docker rm -f "$ASR_CI_CONTAINER" 2>/dev/null || true
+            docker volume rm "$volume" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          docker volume create "$volume" >/dev/null
+          docker run --rm --user 0:0 --network none -v "$volume:/data" --entrypoint python "$image" \
+            -c 'import os; os.mkdir("/data/models", 0o700); os.chown("/data/models", 1000, 1000)'
+          docker run -d --name "$ASR_CI_CONTAINER" --cpus=4 --memory=4g --memory-swap=4g \
+            --pids-limit=128 --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+            --tmpfs /tmp:size=16m,mode=1777,nosuid,nodev,noexec -v "$volume:/data" \
+            -p 127.0.0.1::8080 -e APP_PASSWORD "$image"
+          python -B mochilab-openthai/app/ci_memory_probe.py | tee -a "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/mochingub-kub/mochilab-openthai
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build amd64 image
+        run: docker buildx build --platform linux/amd64 --load --tag "$IMAGE:$GITHUB_SHA" mochilab-openthai/app
+      - name: Publish code-only image and record digest
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          reference="$(docker image inspect "$IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
+          [[ "$reference" =~ @sha256:[0-9a-f]{64}$ ]]
+          printf 'Image: `%s`\n' "$reference" >> "$GITHUB_STEP_SUMMARY"
